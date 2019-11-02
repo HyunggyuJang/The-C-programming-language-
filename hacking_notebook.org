@@ -1,0 +1,355 @@
+#+TITLE: Hacking Notebook
+* The programming language C
+:PROPERTIES:
+:NOTER_DOCUMENT: ../Documents/CS/C/Brian W. Kernighan, Dennis M. Ritchie-The ANSI C Programming Language-Prentice Hall (1988).pdf
+:END:
+** Getting Started
+:PROPERTIES:
+:NOTER_PAGE: 9
+:END:
+We can start the typical hello world program by
+#+BEGIN_SRC C :main no :exports both
+#include <stdio.h>
+
+main(){
+    printf("hello, world\n");
+}
+#+END_SRC
+
+#+RESULTS:
+| hello | world |
+*** Exercise 1-1
+:PROPERTIES:
+:NOTER_PAGE: 11
+:END:
+- Without semicolon:
+  #+BEGIN_SRC C :main no :exports both
+#include <stdio.h>
+
+main(){
+    printf("hello, world\n")
+        }
+  #+END_SRC
+
+  Results in
+  #+BEGIN_SRC C
+/var/folders/2g/yh1q856s0vl6td_twhv6v5g40000gn/T/babel-73iYaS/C-src-323rOQ.c:10:5: warning: type specifier missing, defaults to 'int' [-Wimplicit-int]
+    main(){
+    ^
+/var/folders/2g/yh1q856s0vl6td_twhv6v5g40000gn/T/babel-73iYaS/C-src-323rOQ.c:11:33: error: expected ';' after expression
+        printf("hello, world\n")
+                                ^
+                                ;
+1 warning and 1 error generated.
+/bin/bash: /var/folders/2g/yh1q856s0vl6td_twhv6v5g40000gn/T/babel-73iYaS/C-bin-2QhFQd: Permission denied
+    #+END_SRC
+
+  And replacing the escape sequence, which representing /newline/, with the
+  what that representing:
+  #+BEGIN_SRC C :main no :exports both
+#include <stdio.h>
+
+main(){
+    printf("hello, world
+");
+}
+  #+END_SRC
+
+  Results in
+  #+BEGIN_SRC C
+/var/folders/2g/yh1q856s0vl6td_twhv6v5g40000gn/T/babel-73iYaS/C-src-zMTuoP.c:10:1: warning: type specifier missing, defaults to 'int' [-Wimplicit-int]
+main(){
+^
+/var/folders/2g/yh1q856s0vl6td_twhv6v5g40000gn/T/babel-73iYaS/C-src-zMTuoP.c:11:12: warning: missing terminating '"' character [-Winvalid-pp-token]
+    printf("hello, world
+           ^
+/var/folders/2g/yh1q856s0vl6td_twhv6v5g40000gn/T/babel-73iYaS/C-src-zMTuoP.c:11:12: error: expected expression
+/var/folders/2g/yh1q856s0vl6td_twhv6v5g40000gn/T/babel-73iYaS/C-src-zMTuoP.c:12:1: warning: missing terminating '"' character [-Winvalid-pp-token]
+");
+^
+/var/folders/2g/yh1q856s0vl6td_twhv6v5g40000gn/T/babel-73iYaS/C-src-zMTuoP.c:14:1: error: expected '}'
+^
+/var/folders/2g/yh1q856s0vl6td_twhv6v5g40000gn/T/babel-73iYaS/C-src-zMTuoP.c:10:7: note: to match this '{'
+main(){
+      ^
+3 warnings and 2 errors generated.
+/bin/bash: /var/folders/2g/yh1q856s0vl6td_twhv6v5g40000gn/T/babel-73iYaS/C-bin-qJOtkX: Permission denied
+  #+END_SRC
+
+  Now it got quite cryptic -- compiler got spit outs all the errors not the one
+  that causes all subsequent errors.
+*** Exercise 1-2
+:PROPERTIES:
+:NOTER_PAGE: 11
+:END:
+#+BEGIN_SRC C :main no :exports both
+#include <stdio.h>
+
+main(){
+    printf("\c\b\d\f\e");
+}
+#+END_SRC
+
+#+RESULTS:
+: cd
+
+If the character is not on the mentioned list, it just ignore the backslash --
+just return the following character.
+** Variables and Arithmetic Expressions
+:PROPERTIES:
+:NOTER_PAGE: 11
+:END:
+*** Output formatting function -- =printf=
+:PROPERTIES:
+:NOTER_PAGE: 14
+:END:
+#+BEGIN_SRC C
+printf("%d\t%d\n", fahr, celsius);
+#+END_SRC
+output the first argument -- formatted string -- substituted with second and
+third arguemnt in the place of each =%d=, respectively.
+
+I guess it use =%= as expression to be substituted since this character seems
+like describing the situation where one element being replaced by another.
+*** Exercise 1-3
+:PROPERTIES:
+:NOTER_PAGE: 16
+:END:
+
+#+BEGIN_SRC C :main no :exports both
+#include <stdio.h>
+
+/* print Fahrenheit-Celsius table
+   for fahr = 0, 20, ..., 300; floating-point version*/
+
+main(){
+    float fahr, celsius;
+    float lower, upper, step;
+
+    lower = 0;                  /* lower limit of temperature scale */
+    upper = 300;                /* upper limit */
+    step = 20;                  /* step size */
+
+    fahr = lower;
+    printf("%3s %6s\n", "Fahrenheit", "Celsius");
+    while (fahr <= upper) {
+        celsius = (5.0/9.0) * (fahr - 32.0);
+        printf("%3.0f %6.1f\n", fahr, celsius);
+        fahr = fahr + step;
+    }
+}
+#+END_SRC
+
+#+RESULTS:
+| Fahrenheit | Celsius |
+|          0 |   -17.8 |
+|         20 |    -6.7 |
+|         40 |     4.4 |
+|         60 |    15.6 |
+|         80 |    26.7 |
+|        100 |    37.8 |
+|        120 |    48.9 |
+|        140 |    60.0 |
+|        160 |    71.1 |
+|        180 |    82.2 |
+|        200 |    93.3 |
+|        220 |   104.4 |
+|        240 |   115.6 |
+|        260 |   126.7 |
+|        280 |   137.8 |
+|        300 |   148.9 |
+*** Exercise 1-4
+:PROPERTIES:
+:NOTER_PAGE: 16
+:END:
+
+#+BEGIN_SRC C :main no :exports both
+#include <stdio.h>
+
+/* print Fahrenheit-Celsius table
+   for fahr = 0, 20, ..., 300; floating-point version*/
+
+main(){
+    float fahr, celsius;
+    float lower, upper, step;
+
+    lower = 0;                  /* lower limit of temperature scale */
+    upper = 120;                /* upper limit */
+    step = 10;                  /* step size */
+
+    celsius = lower;
+    printf("%3s %6s\n", "Celsius", "Fahrenheit");
+    while (celsius <= upper) {
+        fahr = (9.0/5.0) * celsius + 32.0;
+        printf("%3.0f %6.1f\n", celsius, fahr);
+        celsius = celsius + step;
+    }
+}
+#+END_SRC
+
+#+RESULTS:
+| Celsius | Fahrenheit |
+|       0 |       32.0 |
+|      10 |       50.0 |
+|      20 |       68.0 |
+|      30 |       86.0 |
+|      40 |      104.0 |
+|      50 |      122.0 |
+|      60 |      140.0 |
+|      70 |      158.0 |
+|      80 |      176.0 |
+|      90 |      194.0 |
+|     100 |      212.0 |
+|     110 |      230.0 |
+|     120 |      248.0 |
+** The for statement
+:PROPERTIES:
+:NOTER_PAGE: 16
+:END:
+*** Exercise 1-5
+:PROPERTIES:
+:NOTER_PAGE: 17
+:END:
+
+#+BEGIN_SRC C :main no :exports both
+#include <stdio.h>
+
+/* print Fahrenheit-Celsius table
+   for fahr = 300, 280, ..., 0; floating-point version*/
+
+main(){
+    int fahr;
+    for (fahr = 300; fahr >= 0; fahr = fahr - 20) {
+        printf("%3d %6.1f\n", fahr, (5.0/9.0) * (fahr - 32.0));
+    }
+}
+
+#+END_SRC
+
+#+RESULTS:
+| 300 | 148.9 |
+| 280 | 137.8 |
+| 260 | 126.7 |
+| 240 | 115.6 |
+| 220 | 104.4 |
+| 200 |  93.3 |
+| 180 |  82.2 |
+| 160 |  71.1 |
+| 140 |  60.0 |
+| 120 |  48.9 |
+| 100 |  37.8 |
+|  80 |  26.7 |
+|  60 |  15.6 |
+|  40 |   4.4 |
+|  20 |  -6.7 |
+|   0 | -17.8 |
+** Symbolic Constants
+:PROPERTIES:
+:NOTER_PAGE: 17
+:END:
+I think symbolic constants, defined by =#define=, would be open-coded when it compiled.
+#+BEGIN_SRC C :includes <stdio.h> :exports both :defines LOWER 0 UPPER 300 STEP 20
+int fahr;
+for (fahr = LOWER; fahr <= UPPER; fahr = fahr + STEP)
+    printf("%3d %6.1f\n", fahr, (5.0/9.0) * (fahr - 32));
+#+END_SRC
+
+#+RESULTS:
+|   0 | -17.8 |
+|  20 |  -6.7 |
+|  40 |   4.4 |
+|  60 |  15.6 |
+|  80 |  26.7 |
+| 100 |  37.8 |
+| 120 |  48.9 |
+| 140 |  60.0 |
+| 160 |  71.1 |
+| 180 |  82.2 |
+| 200 |  93.3 |
+| 220 | 104.4 |
+| 240 | 115.6 |
+| 260 | 126.7 |
+| 280 | 137.8 |
+| 300 | 148.9 |
+** Character Input and Output
+:PROPERTIES:
+:NOTER_PAGE: 18
+:END:
+#+BEGIN_SRC C :includes <stdio.h>
+int c;
+c = 50;
+printf("\ninteger number %d got translated with putchar into %c\n", c, putchar(c));
+#+END_SRC
+
+#+RESULTS:
+|       2 |        |    |     |            |      |         |      |   |
+| integer | number | 50 | got | translated | with | putchar | into | 2 |
+*** File Copying
+:PROPERTIES:
+:NOTER_PAGE: 18
+:END:
+#+BEGIN_SRC C
+/* copy input to output; 1st version */
+int c;
+
+c = getchar();
+while (c != EOF) {
+    putchar(c);
+    c = getchar();
+}
+#+END_SRC
+
+More concisely, experienced C programmer would write above program as
+#+BEGIN_SRC C
+/* copy input to output; 2nd version */
+int c;
+
+while ((c = getchar ()) != EOF)
+    putchar(c);
+#+END_SRC
+
+This exploited the fact that the assignment statement -- ~=~ -- has the value
+evaluating the right hand side as its return value. Here also we should note
+that =EOF= is just one of pre =define= d variable macro that would be replaced
+any integer number that would not appear in the real character code.
+
+Using this /trick/, we should be alerted that now we should be considerate on
+the /precedence/ issue -- ~!=~ has higher precedence than ~=~.
+**** Exercise 1-6
+:PROPERTIES:
+:NOTER_PAGE: 20
+:END:
+#+BEGIN_SRC C :includes <stdio.h> :exports both
+getchar() != EOF;
+#+END_SRC
+
+#+RESULTS:
+#+BEGIN_SRC sh
+~/org Î» ./C_codes/a.out
+5
+The input character 5 return 1 via "getchar() != EOF"
+
+~/org Î» ./C_codes/a.out
+
+The input character
+ return 1 via "getchar() != EOF"
+
+~/org Î» ./C_codes/a.out
+
+The input character ÿ return 0 via "getchar() != EOF"
+#+END_SRC
+
+From this exercise, we know that character ~^D~ represent =EOF= (also apparently
+0 means the test is false and 1 for the true).
+**** Exercise 1-7
+:PROPERTIES:
+:NOTER_PAGE: 20
+:END:
+#+BEGIN_SRC C :includes <stdio.h> :exports both
+putchar(EOF);
+#+END_SRC
+
+#+RESULTS:
+: ÿ
+
+What we discovered in preceding exercise got verified explicitly.
