@@ -353,3 +353,26 @@ putchar(EOF);
 : ÿ
 
 What we discovered in preceding exercise got verified explicitly.
+**** Character Counting
+:PROPERTIES:
+:NOTER_PAGE: 20
+:END:
+New operator, which is the mascot expression in C, =++=:
+#+BEGIN_SRC C
+++nc;
+#+END_SRC
+
+Although we have shown in the above example /prefix/ operator =++=, there is
+also /postfix/ operator =++=; those have different values in expressions.
+
+As introduced in preceding section, the =for= control structure is just
+syntactic sugar for =while=, we could express the word counting program as
+#+BEGIN_SRC C :includes <stdio.h> :exports both
+double nc;
+
+for (nc = 0; getchar () != EOF; ++nc);
+printf("%.0f\n", nc);
+#+END_SRC
+
+#+RESULTS:
+: 0
