@@ -813,8 +813,34 @@ cat C_codes/ex1_14.c | ./C_codes/current
 :PROPERTIES:
 :NOTER_PAGE: 26
 :END:
+Let's test recursive definition of =power=:
+#+BEGIN_SRC C :main no :exports both
+#include <stdio.h>
+int power(int m, int n);
+
+main()
+{
+    int i;
+
+    printf("power(2,5) is %d", power(2, 5));
+}
+
+/* recursive definition of exponentiation */
+int power(int base, int n)
+{
+    if (n == 0)
+        return 1;
+    else
+        return base * power(base, n - 1);
+}
+#+END_SRC
+
+#+RESULTS:
+| power(2 | 5) is 32 |
+
+Yes it works as expected.
 **** Exercise 1-15
-#+BEGIN_SRC C :main no :tangle C_codes/ex1_15.c
+#+BEGIN_SRC C :main no :tangle C_codes/ex1_15.c :exports both
 #include <stdio.h>
 
 #define LOWER 0
@@ -836,10 +862,140 @@ float fahr2cels(float fahr) {
 
 #+END_SRC
 
-Setup:
+#+RESULTS:
+|   0 | -17.8 |
+|  20 |  -6.7 |
+|  40 |   4.4 |
+|  60 |  15.6 |
+|  80 |  26.7 |
+| 100 |  37.8 |
+| 120 |  48.9 |
+| 140 |  60.0 |
+| 160 |  71.1 |
+| 180 |  82.2 |
+| 200 |  93.3 |
+| 220 | 104.4 |
+| 240 | 115.6 |
+| 260 | 126.7 |
+| 280 | 137.8 |
+| 300 | 148.9 |
+** Call by value
+** Character array
+**** Exercise 1-16
+:PROPERTIES:
+:NOTER_PAGE: 31
+:END:
+Since C is strictly typed language, if the specific task does not require, we
+usually do not code in dynamic manner -- recursive function definition and so on.
+
+However in this exercise, we can not cope with this task without using
+dynamically evolving program since we are dealing with unknown input stream --
+it is inheritly dynamic one.
+
+To cope with this task, we will try to use the recursive function definition to
+accommodate sufficient memory for given input stream.
+
+We are going to define =printLongest= that print longest input line. It takes
+=maxline=, =impending[]= (if any), and =overflow= flag:
+#+BEGIN_SRC C :main no :tangle C_codes/ex1_16.c
+#include <stdio.h>
+#define INITIALMAX 10
+
+int getlineFrom(int fromIndex, char line[], int maxline);
+void copy(char to[], char from[]);
+void printLongest(int maxline, char impending[]);
+int isOverflowed(char line[], int lineLength, int maxline);
+
+main()
+{
+    int len;
+    int max;
+    int overflow = 0;
+    char line[INITIALMAX];
+    char longest[INITIALMAX];
+
+    max = 0;
+    while ((len = getlineFrom(0, line, INITIALMAX)) > 0)
+        if (isOverflowed(line, len, INITIALMAX)) {
+            overflow = 1;
+            printLongest(INITIALMAX, line);
+        }
+        else if (len > max) {
+            max = len;
+            copy(longest, line);
+        }
+    if (overflow != 1 && max > 0)
+        printf("%s", longest);
+    return 0;
+}
+
+int getlineFrom(int from, char s[], int lim)
+{
+    int c, i;
+    for (i = from; i < lim-1 && (c=getchar()) != EOF && c != '\n'; ++i)
+        s[i] = c;
+    if (c == '\n') {
+        s[i] = c;
+        ++i;
+    }
+    s[i] = '\0';
+    return i;
+}
+
+void copy(char to[], char from[])
+{
+    int i;
+    for (i = 0; (to[i] = from[i]) != '\0'; ++i)
+        ;
+}
+
+void printLongest(int oldLim, char impending[])
+{
+    int len, max;
+    int overflow = 0;
+    int lim = 2 * oldLim;
+    char line[lim];
+    char longest[lim];
+
+    copy(line, impending);
+    max = len = getlineFrom(oldLim - 1, line, lim);
+    if (isOverflowed(line, len, lim))
+        printLongest(lim, line);
+    else {
+        copy(longest, line);
+        while ((len = getlineFrom(0, line, lim)) > 0)
+            if (isOverflowed(line, len, lim)) {
+                overflow = 1;
+                printLongest(lim, line);
+            }
+            else if (len > max) {
+                max = len;
+                copy(longest, line);
+            }
+        if (overflow != 1)
+            printf("%s", longest);
+    }
+}
+
+int isOverflowed(char s[], int len, int lim) {
+    return (len == lim - 1) && (s[lim - 2] != '\n');
+}
+#+END_SRC
+
+Setup test:
 #+BEGIN_SRC sh
 cd C_codes
-cc ex1_15.c -o current
+cc ex1_16.c -o current
 #+END_SRC
 
 #+RESULTS:
+
+Test:
+#+BEGIN_SRC sh
+printf "test\nsimple\nones" | ./C_codes/current
+printf "Test\noverflowed test case\nlike this" | ./C_codes/current
+#+END_SRC
+
+#+RESULTS:
+| simple    |
+| overflowe |
