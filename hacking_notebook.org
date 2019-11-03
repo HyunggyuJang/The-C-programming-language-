@@ -325,18 +325,18 @@ getchar() != EOF;
 
 #+RESULTS:
 #+BEGIN_SRC sh
-~/org λ ./C_codes/a.out
+~/org Î» ./C_codes/a.out
 5
 The input character 5 return 1 via "getchar() != EOF"
 
-~/org λ ./C_codes/a.out
+~/org Î» ./C_codes/a.out
 
 The input character
  return 1 via "getchar() != EOF"
 
-~/org λ ./C_codes/a.out
+~/org Î» ./C_codes/a.out
 
-The input character � return 0 via "getchar() != EOF"
+The input character ÿ return 0 via "getchar() != EOF"
 #+END_SRC
 
 From this exercise, we know that character ~^D~ represent =EOF= (also apparently
@@ -350,10 +350,10 @@ putchar(EOF);
 #+END_SRC
 
 #+RESULTS:
-: �
+: ÿ
 
 What we discovered in preceding exercise got verified explicitly.
-**** Character Counting
+*** Character Counting
 :PROPERTIES:
 :NOTER_PAGE: 20
 :END:
@@ -376,3 +376,107 @@ printf("%.0f\n", nc);
 
 #+RESULTS:
 : 0
+**** Exercise 1-8
+:PROPERTIES:
+:NOTER_PAGE: 22
+:END:
+#+BEGIN_SRC C :includes <stdio.h> :exports both
+long ns, nt, nl;
+int c;
+
+ns = 0;
+nt = 0;
+nl = 0;
+
+while ((c = getchar ()) != EOF) {
+    if (c == ' ')
+        ++ns;
+    if (c == '\t')
+        ++nt;
+    if (c == '\n')
+        ++nl;
+}
+printf("The number of blanks, tabs, lines are %ld, %ld, %ld, respectively\n", ns, nt, nl);
+#+END_SRC
+
+#+RESULTS:
+| The number of blanks | tabs | lines are 0 | 0 | 0 | respectively |
+**** Exercise 1-9
+:PROPERTIES:
+:NOTER_PAGE: 22
+:END:
+Here is the algorithm that solves our task:
+1. If the input character stream is not =EOF=,
+2. if taken character stream is blank, print single blank and then
+3. consume all the successive blanks;
+4. else, print that input stream and then update character stream.
+5. go to *1.*
+
+Since we haven't yet learned the =else= control structure -- only =if=-then
+structure -- we need to mimic the =if-else= structure:
+
+#+BEGIN_SRC C :exports both
+int c;
+int flag;
+c = getchar();
+while (c != EOF) {
+    flag = 0;               /* mimic if else control structure */
+    if (c == ' ') {
+        putchar(c);         /* print single blank */
+        flag = 1;           /* signal that the entry character was blank */
+        while ((c = getchar()) == ' ') /* comsume the successive blanks */
+            ;
+    }
+    if (flag == 0) {        /* if the entry point was non-blank character */
+        putchar(c);
+        c = getchar();      /* update the c to be consist with comsumption of blanks */
+    }
+}
+#+END_SRC
+
+Then it works as expected:
+#+BEGIN_SRC sh
+~/org/C_codes [master] λ ./a.out
+asdfsd   sdf   d
+asdfsd sdf d
+Hi Test thsi    tis   d
+Hi Test thsi tis d
+
+#+END_SRC
+**** Exercise 1-10
+:PROPERTIES:
+:NOTER_PAGE: 22
+:END:
+This program is analogous that of [[*Exercise 1-8][Exercise 1-8]], mimicking the =else= structure:
+#+BEGIN_SRC C :includes <stdio.h> :exports both
+
+int c, flag;
+
+
+while ((c = getchar ()) != EOF) {
+    flag = 1;
+    if (c == '\b') {
+        flag = 0;
+        printf("\\b");
+    }
+    if (c == '\t') {
+        flag = 0;
+        printf("\\t");
+    }
+    if (c == '\n') {
+        flag = 0;
+        printf("\\n");
+    }
+    if (c == '\\') {
+        flag = 0;
+        printf("\\\\");
+    }
+    if (flag)
+        putchar(c);
+}
+#+END_SRC
+
+#+BEGIN_SRC sh
+~/org/C_codes [master] λ echo "tab	\	" | ./a.out
+tab\t\\\t\n
+#+END_SRC
