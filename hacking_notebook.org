@@ -480,3 +480,165 @@ while ((c = getchar ()) != EOF) {
 ~/org/C_codes [master] λ echo "tab	\	" | ./a.out
 tab\t\\\t\n
 #+END_SRC
+*** Word Counting
+:PROPERTIES:
+:NOTER_PAGE: 22
+:END:
+
+#+BEGIN_SRC C :tangle C_codes/current.c :includes <stdio.h> :defines IN 1 OUT 0
+int c, nl, nw, nc, state;
+
+state = OUT;
+nl = nw = nc = 0;
+while ((c = getchar()) != EOF) {
+    ++nc;
+    if (c == '\n')
+        ++nl;
+    if (c == ' ' || c == '\n' || c == '\t')
+        state = OUT;
+    else if (state == OUT) {
+        state = IN;
+        ++nw;
+    }
+}
+printf("%d %d %d\n", nl, nw, nc);
+#+END_SRC
+
+#+RESULTS:
+: 0 0 0
+**** Exercise 1-11
+:PROPERTIES:
+:NOTER_PAGE: 23
+:END:
+
+In Org mode, we can use session whenever the language supports ~REPL~; but since
+C is the language should involve compiler to produce program, we can not use
+them.
+
+So we have to fall back to alternative approach: Use tangle feature.
+
+Then let's test this code:
+#+BEGIN_SRC sh
+cd C_codes
+cc current.c -o current
+#+END_SRC
+
+#+RESULTS:
+
+#+BEGIN_SRC sh :exports both
+echo "This text contains 5 words." | ./C_codes/current
+#+END_SRC
+
+#+RESULTS:
+: 1 5 28
+
+We've setup the environment where we integrated the Org babel with the testing C code.
+
+To test this kind of program, we can take two different approaches:
+1. Path complete test;
+2. black box test -- test the specifications.
+
+
+The former one tests all the branches the code implemented; in above case, it
+has 2 branches in it: First only has consequent clause, second has also
+alternative in addition to consequence:
+#+BEGIN_SRC C
+    if (c == '\n')
+        ++nl;
+    if (c == ' ' || c == '\n' || c == '\t')
+        state = OUT;
+    else if (state == OUT) {
+        state = IN;
+        ++nw;
+    }
+#+END_SRC
+
+First, let's try the path complete test:
+#+BEGIN_SRC sh :exports both
+# Test first branch
+echo | ./C_codes/current        # echo append '\n' by default
+printf | ./C_codes/current      # printf do not append '\n'
+# Test second branch
+# just pass through first path of second branch
+printf "\n\n\n   \t\t\t" | ./C_codes/current
+# pass though the second path also
+printf "This text contains 5 words." | ./C_codes/current
+#+END_SRC
+
+#+RESULTS:
+| 1 | 0 |  1 |
+| 0 | 0 |  0 |
+| 3 | 0 |  9 |
+| 0 | 5 | 27 |
+
+Then let's do the latter one; it tests all the boundary cases:
+#+BEGIN_SRC sh :exports both
+# 0 0 0
+printf | ./C_codes/current
+# 1 0 1
+echo | ./C_codes/current
+# 0 0 1
+printf " " | ./C_codes/current  # space
+printf "\t" | ./C_codes/current  # tab
+# 0 1 1
+printf "c" | ./C_codes/current
+# Compound cases
+printf "This is \n compound case.\t" | ./C_codes/current
+#+END_SRC
+
+#+RESULTS:
+| 0 | 0 |  0 |
+| 1 | 0 |  1 |
+| 0 | 0 |  1 |
+| 0 | 0 |  1 |
+| 0 | 1 |  1 |
+| 1 | 4 | 25 |
+**** Exercise 1-12
+:PROPERTIES:
+:NOTER_PAGE: 23
+:END:
+All we need to do is
+- just copying the input if it were transition of state from
+  =IN= to =IN= or =OUT= to =IN=;
+- ignore if it were from =OUT= to =OUT=;
+- replace it as =\n= if it were from =IN= to =OUT=;
+
+
+#+BEGIN_SRC C :tangle C_codes/ex1_12.c :includes <stdio.h> :defines IN 1 OUT 0
+int c, state;
+
+state = OUT;
+while ((c = getchar()) != EOF) {
+    if (c == ' ' || c == '\n' || c == '\t') {
+        if (state == OUT)
+            ;                   /* ignore the input character */
+        else {
+            state = OUT;
+            putchar('\n');
+        }
+    }
+    else {
+        state = IN;
+        putchar(c);
+    }
+}
+#+END_SRC
+
+Then test:
+#+BEGIN_SRC sh
+cd C_codes
+cc ex1_12.c -o current
+#+END_SRC
+
+#+RESULTS:
+
+#+BEGIN_SRC sh :exports both
+printf "Test words\n\n\n\t\t\t   One Two     Three" | ./C_codes/current
+#+END_SRC
+
+#+RESULTS:
+| Test  |
+| words |
+| One   |
+| Two   |
+| Three |
