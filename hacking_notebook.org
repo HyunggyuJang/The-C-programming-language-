@@ -642,3 +642,204 @@ printf "Test words\n\n\n\t\t\t   One Two     Three" | ./C_codes/current
 | One   |
 | Two   |
 | Three |
+** Arrays
+:PROPERTIES:
+:NOTER_PAGE: 25
+:END:
+**** Exercise 1-13
+:PROPERTIES:
+:NOTER_PAGE: 25
+:END:
+The most canonical way to implement this program would be
+1. Assume that we have data structure, table that contains entries which
+   consist of key and value;
+2. modifying the word counting program, which we implemented in preceding
+   section, implement program that counts the length of first word from the
+   input stream;
+3. for each word in the input stream, insert newly calculated word length into
+   the predefined table that contains word length - frequency entries;
+4. print the entries in that table using histogram.
+
+
+But, only with what we've learned so far, we can not implement the assumed data
+structure, so we need to approach this exercise in more naive manner.
+
+We are going to use array as table like structure but that table possibly be
+very scarce -- inefficient; moreover, as we are not allowed to allocates the
+input stream into some temporary file or on memory to use more than once, we can
+not cope with extreme cases where maximum word length is enormous.
+
+
+Here is the resulting code, which approximately implement above algorithm naively:
+#+BEGIN_SRC C :tangle C_codes/ex1_13.c :includes <stdio.h> :defines IN 1 OUT 0 MAX_LENG 100
+
+int c, i, j, wl, state;
+int nwords[MAX_LENG];
+
+state = OUT;
+wl = 0;
+for (i = 0; i < MAX_LENG; ++i)
+    nwords[i] = 0;
+
+while ((c = getchar()) != EOF) {
+    if (c == ' ' || c == '\n' || c == '\t') {
+        if (state == IN)        /* IN -> OUT transition */
+            ++nwords[wl];
+
+        state = OUT;
+    }
+    else {
+        if (state == OUT)       /* OUT -> IN transition */
+            wl = 0;             /* initialize word length counter */
+        state = IN;
+        ++wl;
+    }
+}
+
+if (state == IN)                /* EOF is also delimiter */
+    ++nwords[wl];
+
+printf("%s\t%s\n", "Word length", "Frequency");
+for (i = 0; i < MAX_LENG; ++i) {
+    if (nwords[i] != 0) {       /* print only non zero frequency entries */
+        printf("%d\t", i);
+        for (j = 0; j < nwords[i]; ++j) /* print histogram which represent frequency */
+            putchar('*');
+        putchar('\n');
+    }
+}
+#+END_SRC
+
+Then setup
+#+BEGIN_SRC sh
+cd C_codes
+cc ex1_13.c -o current
+#+END_SRC
+
+#+RESULTS:
+
+Then test by feeding the source program itself to the compiled program:
+#+BEGIN_SRC sh :exports both
+cat C_codes/ex1_13.c | ./C_codes/current
+# printf "test\nMy-test test" | ./C_codes/current
+#+END_SRC
+
+#+RESULTS:
+| Word length | Frequency                                          |
+|           1 | **********************************                 |
+|           2 | ************************************************** |
+|           3 | ******************                                 |
+|           4 | *************                                      |
+|           5 | **********                                         |
+|           6 | *******                                            |
+|           7 | *****                                              |
+|           8 | ***                                                |
+|           9 | *********                                          |
+|          10 | ******                                             |
+|          13 | ****                                               |
+|          14 | **                                                 |
+|          17 | *                                                  |
+|          18 | *                                                  |
+**** Exercise 1-14
+:PROPERTIES:
+:NOTER_PAGE: 25
+:END:
+This is an analogous program of preceding exercise. The maximum length becomes
+='z' - 'a'= and the others are obvious relations:
+
+#+BEGIN_SRC C :tangle C_codes/ex1_14.c :includes <stdio.h>
+int c, i, j;
+int length = 'z' - 'a' + 1;
+int nchars[length];
+
+for (i = 0; i < length; ++i)
+    nchars[i] = 0;
+
+while ((c = getchar()) != EOF) {
+    if ('a' <= c && c <= 'z')
+        ++nchars[c - 'a'];
+}
+
+printf("%s\t%s\n", "Character", "Frequency");
+for (i = 0; i < length; ++i) {
+    if (nchars[i] != 0) {       /* print only non zero frequency entries */
+        printf("%c\t", i + 'a');
+        for (j = 0; j < nchars[i]; ++j) /* print histogram which represent frequency */
+            putchar('*');
+        putchar('\n');
+    }
+}
+#+END_SRC
+
+Then setup
+#+BEGIN_SRC sh
+cd C_codes
+cc ex1_14.c -o current
+#+END_SRC
+
+#+RESULTS:
+
+Then test by feeding the source program itself to the compiled program:
+#+BEGIN_SRC sh :exports both
+cat C_codes/ex1_14.c | ./C_codes/current
+# printf "zzzz AAA aaaa" | ./C_codes/current # only count lowercase character
+#+END_SRC
+
+#+RESULTS:
+| Character | Frequency                      |
+| a         | ****************               |
+| c         | ********************           |
+| d         | **                             |
+| e         | *********************          |
+| f         | *********                      |
+| g         | ******                         |
+| h         | ******************             |
+| i         | ****************************   |
+| j         | ****                           |
+| l         | *******                        |
+| m         | **                             |
+| n         | ****************************** |
+| o         | ********                       |
+| p         | *******                        |
+| q         | ***                            |
+| r         | ***************************    |
+| s         | ***********                    |
+| t         | ***********************        |
+| u         | *******                        |
+| w         | **                             |
+| y         | ****                           |
+| z         | ***                            |
+** Functions
+:PROPERTIES:
+:NOTER_PAGE: 26
+:END:
+**** Exercise 1-15
+#+BEGIN_SRC C :main no :tangle C_codes/ex1_15.c
+#include <stdio.h>
+
+#define LOWER 0
+#define UPPER 300
+#define STEP 20
+
+float fahr2cels(float fahr);
+/* test temperature conversion function */
+main () {
+    float fahr;
+    for (fahr = LOWER; fahr <= UPPER; fahr = fahr + STEP)
+        printf("%3.0f %6.1f\n", fahr, fahr2cels(fahr));
+    return 0;
+}
+/* temperature conversion function from fahrenheit to celsius*/
+float fahr2cels(float fahr) {
+    return (5.0/9.0) * (fahr - 32.0);
+}
+
+#+END_SRC
+
+Setup:
+#+BEGIN_SRC sh
+cd C_codes
+cc ex1_15.c -o current
+#+END_SRC
+
+#+RESULTS:
