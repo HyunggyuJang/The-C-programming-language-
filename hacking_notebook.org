@@ -895,15 +895,15 @@ it is inheritly dynamic one.
 To cope with this task, we will try to use the recursive function definition to
 accommodate sufficient memory for given input stream.
 
-We are going to define =printLongest= that print longest input line. It takes
-=maxline=, =impending[]= (if any), and =overflow= flag:
+We are going to define =printOverflowed= that print longest input line. It takes
+=maxline=, =impending[]= (if any):
 #+BEGIN_SRC C :main no :tangle C_codes/ex1_16.c
 #include <stdio.h>
 #define INITIALMAX 10
 
 int getlineFrom(int fromIndex, char line[], int maxline);
 void copy(char to[], char from[]);
-void printLongest(int maxline, char impending[]);
+void printOverflowed(int maxline, char impending[]);
 int isOverflowed(char line[], int lineLength, int maxline);
 
 main()
@@ -918,7 +918,7 @@ main()
     while ((len = getlineFrom(0, line, INITIALMAX)) > 0)
         if (isOverflowed(line, len, INITIALMAX)) {
             overflow = 1;
-            printLongest(INITIALMAX, line);
+            printOverflowed(INITIALMAX, line);
         }
         else if (len > max) {
             max = len;
@@ -949,7 +949,7 @@ void copy(char to[], char from[])
         ;
 }
 
-void printLongest(int oldLim, char impending[])
+void printOverflowed(int oldLim, char impending[])
 {
     int len, max;
     int overflow = 0;
@@ -960,13 +960,13 @@ void printLongest(int oldLim, char impending[])
     copy(line, impending);
     max = len = getlineFrom(oldLim - 1, line, lim);
     if (isOverflowed(line, len, lim))
-        printLongest(lim, line);
+        printOverflowed(lim, line);
     else {
         copy(longest, line);
         while ((len = getlineFrom(0, line, lim)) > 0)
             if (isOverflowed(line, len, lim)) {
                 overflow = 1;
-                printLongest(lim, line);
+                printOverflowed(lim, line);
             }
             else if (len > max) {
                 max = len;
@@ -982,6 +982,10 @@ int isOverflowed(char s[], int len, int lim) {
 }
 #+END_SRC
 
+We've handled the overflowed condition explicitly using the =printOverflowed=
+function. It is almost same as the entry point function, =main= except it
+handles allocates the current line and longest line with extended limit array indice.
+
 Setup test:
 #+BEGIN_SRC sh
 cd C_codes
@@ -991,11 +995,11 @@ cc ex1_16.c -o current
 #+RESULTS:
 
 Test:
-#+BEGIN_SRC sh
+#+BEGIN_SRC sh :exports both
 printf "test\nsimple\nones" | ./C_codes/current
 printf "Test\noverflowed test case\nlike this" | ./C_codes/current
 #+END_SRC
 
 #+RESULTS:
-| simple    |
-| overflowe |
+| simple     |      |      |
+| overflowed | test | case |
