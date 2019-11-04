@@ -1438,3 +1438,182 @@ printf "test empty line\n     	\nlike this" | ./C_codes/current
 : like this
 
 Works as expected.
+**** Exercise 1-19
+:PROPERTIES:
+:NOTER_PAGE: 31
+:END:
+I've designed this problem -- the algorithm behind this -- in my digital paper.
+It is way more easy to describe in image rather than text; briefly, we are going
+to reverse given array in place -- looping through half of the index and
+interchange front half part with rear half part.
+
+#+BEGIN_SRC C :main no :results verbatim :exports both
+#include <stdio.h>
+
+void reverse(int length, char line[]);
+int stringLength(char line[]);
+void copy(char to[], char from[]);
+
+/* Test remove trailings */
+int main()
+{
+    char test[] = "Reverse test  \t HiiH \n";
+    int len = stringLength(test);
+    char testCopy[len];
+    copy(testCopy, test);       /* copy the test into the testCopy */
+    reverse(len, test); /* reverse the test */
+    printf("%s got reversed as \n%s",
+           testCopy,
+           test);
+    return 0;
+}
+
+void reverse(int len, char s[])
+{
+    int lastIndex = len - 2;    /* lastIndex except the newline character */
+    int halfIndex = (lastIndex - 1) / 2; /* use integer division to be used in loop */
+    char temp;                           /* temporary storage to interchange */
+    int i;                               /* loop index */
+    for (i = 0; i <= halfIndex; ++i) {
+        temp = s[i];
+        s[i] = s[lastIndex - i];
+        s[lastIndex - i] = temp;
+    }
+}
+
+void copy(char to[], char from[])
+{
+    int i;
+    for (i = 0; (to[i] = from[i]) != '\0'; ++i)
+        ;
+}
+
+int stringLength(char s[]) {
+    int len;
+    for (len = 0; s[len] != '\0'; ++len)
+        ;
+    return len;
+}
+#+END_SRC
+
+#+RESULTS:
+: Reverse test  	 HiiH
+:  got reversed as
+:  HiiH 	  tset esreveR
+
+It works as expected.
+
+Let's finish our works as usual:
+
+#+BEGIN_SRC C :main no :tangle C_codes/ex1_19.c
+#include <stdio.h>
+#define INITIALMAX 10
+#define TRUE 1
+
+int getlineFrom(int fromIndex, char line[], int maxline);
+void printOverflowed(int maxline, char impending[], int isentrypoint);
+int isOverflowed(char line[], int lineLength, int maxline);
+void reverse(int length, char line[]);
+void copy(char to[], char from[]);
+
+int main()
+{
+    printOverflowed(INITIALMAX, "", TRUE);
+    return 0;
+}
+
+void reverse(int len, char s[])
+{
+    int lastIndex = len - 2;    /* lastIndex except the newline character */
+    int halfIndex = (lastIndex - 1) / 2; /* use integer division to be used in loop */
+    char temp;                           /* temporary storage to interchange */
+    int i;                               /* loop index */
+    for (i = 0; i <= halfIndex; ++i) {
+        temp = s[i];
+        s[i] = s[lastIndex - i];
+        s[lastIndex - i] = temp;
+    }
+}
+
+void copy(char to[], char from[])
+{
+    int i;
+    for (i = 0; (to[i] = from[i]) != '\0'; ++i)
+        ;
+}
+
+int getlineFrom(int from, char s[], int lim)
+{
+    int c, i;
+    for (i = from; i < lim-1 && (c=getchar()) != EOF && c != '\n'; ++i)
+        s[i] = c;
+    if (c == '\n') {
+        s[i] = c;
+        ++i;
+    }
+    s[i] = '\0';
+    return i;
+}
+
+void printOverflowed(int oldLim, char impending[], int isentry)
+{
+    int len;
+    int lim;
+
+    if (isentry)
+        lim = oldLim;
+    else lim = 2 * oldLim;
+
+    char line[lim];
+
+    if (!isentry) {
+        copy(line, impending);
+        len = getlineFrom(oldLim - 1, line, lim);
+    }
+
+    if (!isentry && isOverflowed(line, len, lim))
+        printOverflowed(lim, line, 0);
+    else {
+        if (!isentry) {
+            reverse(len, line);
+            printf("%s", line);
+        }
+        while ((len = getlineFrom(0, line, lim)) > 0)
+            if (isOverflowed(line, len, lim)) {
+                printOverflowed(lim, line, 0);
+            }
+            else {
+                reverse(len, line);
+                printf("%s", line);
+            }
+
+    }
+}
+
+int isOverflowed(char s[], int len, int lim) {
+    return (len == lim - 1) && (s[lim - 2] != '\n');
+}
+#+END_SRC
+
+Setup test:
+#+BEGIN_SRC sh
+cd C_codes
+cc ex1_19.c -o current
+#+END_SRC
+
+#+RESULTS:
+
+Test:
+#+BEGIN_SRC sh :exports both :results verbatim
+printf "trailings        	\nsimple\nones\n" | ./C_codes/current
+printf "test empty line\n     	\nlike this" | ./C_codes/current
+# printf "Test\noverflowed test case longer than twice!\nlike this" | ./C_codes/current
+#+END_SRC
+
+#+RESULTS:
+: 	        sgniliart
+: elpmis
+: seno
+: enil ytpme tset
+:
+: iht ekils
