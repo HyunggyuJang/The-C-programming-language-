@@ -37,15 +37,18 @@ void printOverflowed(int oldLim, char impending[], int isentry)
     int len, max;
     int overflow = 0;
     int lim;
+
+    if (isentry)
+        lim = oldLim;
+    else lim = 2 * oldLim;
+
     char line[lim];
     char longest[lim];
 
     if (isentry) {
-        lim = oldLim;
         max = 0;
     }
     else {
-        lim = 2 * oldLim;
         copy(line, impending);
         max = len = getlineFrom(oldLim - 1, line, lim);
     }
