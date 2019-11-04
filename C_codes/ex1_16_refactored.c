@@ -3,29 +3,12 @@
 
 int getlineFrom(int fromIndex, char line[], int maxline);
 void copy(char to[], char from[]);
-void printOverflowed(int maxline, char impending[]);
+void printOverflowed(int maxline, char impending[], int isentrypoint);
 int isOverflowed(char line[], int lineLength, int maxline);
 
 main()
 {
-    int len;
-    int max;
-    int overflow = 0;
-    char line[INITIALMAX];
-    char longest[INITIALMAX];
-
-    max = 0;
-    while ((len = getlineFrom(0, line, INITIALMAX)) > 0)
-        if (isOverflowed(line, len, INITIALMAX)) {
-            overflow = 1;
-            printOverflowed(INITIALMAX, line);
-        }
-        else if (len > max) {
-            max = len;
-            copy(longest, line);
-        }
-    if (overflow != 1 && max > 0)
-        printf("%s", longest);
+    printOverflowed(INITIALMAX, "", 1);
     return 0;
 }
 
@@ -49,30 +32,39 @@ void copy(char to[], char from[])
         ;
 }
 
-void printOverflowed(int oldLim, char impending[])
+void printOverflowed(int oldLim, char impending[], int isentry)
 {
     int len, max;
     int overflow = 0;
-    int lim = 2 * oldLim;
+    int lim;
     char line[lim];
     char longest[lim];
 
-    copy(line, impending);
-    max = len = getlineFrom(oldLim - 1, line, lim);
-    if (isOverflowed(line, len, lim))
-        printOverflowed(lim, line);
+    if (isentry) {
+        lim = oldLim;
+        max = 0;
+    }
     else {
-        copy(longest, line);
+        lim = 2 * oldLim;
+        copy(line, impending);
+        max = len = getlineFrom(oldLim - 1, line, lim);
+    }
+
+    if (!isentry && isOverflowed(line, len, lim))
+        printOverflowed(lim, line, 0);
+    else {
+        if (!isentry)
+            copy(longest, line);
         while ((len = getlineFrom(0, line, lim)) > 0)
             if (isOverflowed(line, len, lim)) {
                 overflow = 1;
-                printOverflowed(lim, line);
+                printOverflowed(lim, line, 0);
             }
             else if (len > max) {
                 max = len;
                 copy(longest, line);
             }
-        if (overflow != 1)
+        if (!overflow && (!isentry || (isentry && max > 0)))
             printf("%s", longest);
     }
 }

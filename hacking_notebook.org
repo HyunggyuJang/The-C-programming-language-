@@ -997,9 +997,233 @@ cc ex1_16.c -o current
 Test:
 #+BEGIN_SRC sh :exports both
 printf "test\nsimple\nones" | ./C_codes/current
-printf "Test\noverflowed test case\nlike this" | ./C_codes/current
+printf "Test\noverflowed test case longer than twice!\nlike this" | ./C_codes/current
 #+END_SRC
 
 #+RESULTS:
-| simple     |      |      |
-| overflowed | test | case |
+| simple     |      |      |        |      |        |
+| overflowed | test | case | longer | than | twice! |
+**** Exercise 1-17
+:PROPERTIES:
+:NOTER_PAGE: 31
+:END:
+We can achieve what we want by modifying the preceding example. That is,
+whenever we encounters input line that is longer than threadhold length.
+
+Before doing modification of code of [[*Exercise 1-16][Exercise 1-16]], let us first refactor that
+code to encompass the entry point case into the =printOverflowed= so that we can
+easily change the behavior of that program by making them modular.
+
+We used following experiment to refactor our code:
+
+#+NAME: Test logical not
+#+BEGIN_SRC C :exports both
+printf("%d", !0);
+#+END_SRC
+
+#+RESULTS:
+: 1
+
+#+BEGIN_SRC C :main no :tangle C_codes/ex1_16_refactored.c
+#include <stdio.h>
+#define INITIALMAX 10
+
+int getlineFrom(int fromIndex, char line[], int maxline);
+void copy(char to[], char from[]);
+void printOverflowed(int maxline, char impending[], int isentrypoint);
+int isOverflowed(char line[], int lineLength, int maxline);
+
+main()
+{
+    printOverflowed(INITIALMAX, "", 1);
+    return 0;
+}
+
+int getlineFrom(int from, char s[], int lim)
+{
+    int c, i;
+    for (i = from; i < lim-1 && (c=getchar()) != EOF && c != '\n'; ++i)
+        s[i] = c;
+    if (c == '\n') {
+        s[i] = c;
+        ++i;
+    }
+    s[i] = '\0';
+    return i;
+}
+
+void copy(char to[], char from[])
+{
+    int i;
+    for (i = 0; (to[i] = from[i]) != '\0'; ++i)
+        ;
+}
+
+void printOverflowed(int oldLim, char impending[], int isentry)
+{
+    int len, max;
+    int overflow = 0;
+    int lim;
+
+    if (isentry)
+        lim = oldLim;
+    else lim = 2 * oldLim;
+
+    char line[lim];
+    char longest[lim];
+
+    if (isentry) {
+        max = 0;
+    }
+    else {
+        copy(line, impending);
+        max = len = getlineFrom(oldLim - 1, line, lim);
+    }
+
+    if (!isentry && isOverflowed(line, len, lim))
+        printOverflowed(lim, line, 0);
+    else {
+        if (!isentry)
+            copy(longest, line);
+        while ((len = getlineFrom(0, line, lim)) > 0)
+            if (isOverflowed(line, len, lim)) {
+                overflow = 1;
+                printOverflowed(lim, line, 0);
+            }
+            else if (len > max) {
+                max = len;
+                copy(longest, line);
+            }
+        if (!overflow && (!isentry || (isentry && max > 0)))
+            printf("%s", longest);
+    }
+}
+
+int isOverflowed(char s[], int len, int lim) {
+    return (len == lim - 1) && (s[lim - 2] != '\n');
+}
+#+END_SRC
+
+Our =main= routine got simplified just calling the subroutines appropriately.
+Let's test this refactored code:
+
+
+Setup test:
+#+BEGIN_SRC sh
+cd C_codes
+cc ex1_16_refactored.c -o current
+#+END_SRC
+
+#+RESULTS:
+
+Test:
+#+BEGIN_SRC sh :exports both
+printf "test\nsimple\nones" | ./C_codes/current
+printf "Test\noverflowed test case longer than twice!\nlike this" | ./C_codes/current
+#+END_SRC
+
+#+RESULTS:
+| simple     |      |      |        |      |        |
+| overflowed | test | case | longer | than | twice! |
+
+It works as expected.
+
+Now we turn to the our original task; it actually simpler than preceding
+exercise. All we need to do is just print given line if it is longer than the
+threadhold length.
+
+#+BEGIN_SRC C :main no :tangle C_codes/ex1_17.c
+#include <stdio.h>
+#define INITIALMAX 10
+#define TREADHOLD 8
+
+int getlineFrom(int fromIndex, char line[], int maxline);
+void printOverflowed(int maxline, char impending[], int isentrypoint);
+void copy(char to[], char from[]);
+int isOverflowed(char line[], int lineLength, int maxline);
+
+main()
+{
+    printOverflowed(INITIALMAX, "", 1);
+    return 0;
+}
+
+int getlineFrom(int from, char s[], int lim)
+{
+    int c, i;
+    for (i = from; i < lim-1 && (c=getchar()) != EOF && c != '\n'; ++i)
+        s[i] = c;
+    if (c == '\n') {
+        s[i] = c;
+        ++i;
+    }
+    s[i] = '\0';
+    return i;
+}
+
+void printOverflowed(int oldLim, char impending[], int isentry)
+{
+    int len;
+    int overflow = 0;
+    int lim;
+
+    if (isentry)
+        lim = oldLim;
+    else lim = 2 * oldLim;
+
+    char line[lim];
+
+    if (!isentry) {
+        copy(line, impending);
+        len = getlineFrom(oldLim - 1, line, lim);
+    }
+
+    if (!isentry && isOverflowed(line, len, lim))
+        printOverflowed(lim, line, 0);
+    else {
+        if (!isentry)
+            if (len >= TREADHOLD)
+                printf("%s", line);
+        while ((len = getlineFrom(0, line, lim)) > 0)
+            if (isOverflowed(line, len, lim)) {
+                overflow = 1;
+                printOverflowed(lim, line, 0);
+            }
+            else if (len >= TREADHOLD)
+                printf("%s", line);
+
+    }
+}
+
+void copy(char to[], char from[])
+{
+    int i;
+    for (i = 0; (to[i] = from[i]) != '\0'; ++i)
+        ;
+}
+
+int isOverflowed(char s[], int len, int lim) {
+    return (len == lim - 1) && (s[lim - 2] != '\n');
+}
+#+END_SRC
+
+Setup test:
+#+BEGIN_SRC sh
+cd C_codes
+cc ex1_17.c -o current
+#+END_SRC
+
+#+RESULTS:
+
+Test:
+#+BEGIN_SRC sh :exports both
+printf "threadhold\nsimple\nones" | ./C_codes/current
+printf "Test\noverflowed test case longer than twice!\nlike this" | ./C_codes/current
+#+END_SRC
+
+#+RESULTS:
+| threadhold |      |      |        |      |        |
+| overflowed | test | case | longer | than | twice! |
+| like       | this |      |        |      |        |
+
+Seems like works well.
