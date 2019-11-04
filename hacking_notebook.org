@@ -1227,3 +1227,89 @@ printf "Test\noverflowed test case longer than twice!\nlike this" | ./C_codes/cu
 | like       | this |      |        |      |        |
 
 Seems like works well.
+**** Exercise 1-18
+:PROPERTIES:
+:NOTER_PAGE: 31
+:END:
+What we need is function that removes trailing blanks and tabs from given line;
+if we implement that function, all the left is to apply that function to each of
+input line that is allowed to be arbitrary length.
+
+So here we are going to design remove trailing blanks and tabs from given
+argument character array. It needs to take character array with the length of
+that to detect the last element; it will mutate the argument array if it has
+trailing white spaces. And finally it will return the truncated length to make
+the caller to take action with that information -- for this specific case, not
+to print the zero length line.
+
+#+BEGIN_SRC C :main no :results verbatim :exports both
+#include <stdio.h>
+
+int removeTrailings(int length, char line[]);
+int isWhite(char character);
+int stringLength(char line[]);
+void copy(char to[], char from[]);
+
+/* Test remove trailings */
+int main()
+{
+    char test[] = "Test trailings     		  \n";
+    int len = stringLength(test);
+    char testCopy[len];
+    copy(testCopy, test);       /* copy the test into the testCopy */
+    removeTrailings(len, test); /* remove trailings of test */
+    printf("%s, which has length %d, got truncated as \n%s, which now has length %d",
+           testCopy,
+           stringLength(testCopy),
+           test,
+           stringLength(test));
+    return 0;
+}
+
+int removeTrailings(int len, char s[])
+{
+    int i = len - 2;
+    int newlen;
+    if (isWhite(s[i])) {
+        s[i+1] = '\0';          /* make the newline character to be null */
+        while(i >= 0 && isWhite(s[i])) { /* make sure not to be underflow */
+            s[i] = '\0';        /* remove trailing white spaces */
+            --i;
+        }
+        if (i >= 0) {
+            ++i;
+            s[i] = '\n';      /* restore newline character to be end of new result */
+            newlen = i;         /* new length */
+        } else
+            newlen = 0;
+    } else
+        newlen = len;
+    return newlen;
+}
+
+int isWhite(char c) {
+    return c == '\t' || c == ' ';
+}
+
+void copy(char to[], char from[])
+{
+    int i;
+    for (i = 0; (to[i] = from[i]) != '\0'; ++i)
+        ;
+}
+
+int stringLength(char s[]) {
+    int len;
+    for (len = 0; s[len] != '\0'; ++len)
+        ;
+    return len;
+}
+#+END_SRC
+
+#+RESULTS:
+: Test trailings
+: , which has length 24, got truncated as
+: Test trailings
+: , which now has length 15
+
+Seems works well.
