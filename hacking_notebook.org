@@ -1660,7 +1660,7 @@ So, our program keep track of the current column index as state variable. Here
 is the implementation:
 #+BEGIN_SRC C :main no :tangle C_codes/ex1_20.c
 #include <stdio.h>
-#define TABSTOP 4                     /* Tab stob */
+#define TABSTOP 4                     /* Tab stop */
 
 int expandtab(int columnIndex);
 
@@ -1681,7 +1681,6 @@ int main() {
 }
 
 int expandtab(int nc) {
-    int nextColumn;
     if ((nc % TABSTOP) == 0) {
         putchar(' ');
         ++nc;
@@ -1699,15 +1698,89 @@ should be product of =TABSTOP=; since if the given column index is already
 product of =TABSTOP=, it means we should expand the =tab= until next tabstop in
 this case, we handled this case explicitly.
 
+Or the we can think =ncolumn= as if the cursor's column number and the input
+character stream as user typing in the text editor like now.
+
 Setup test:
 #+BEGIN_SRC sh
 cd C_codes
-cc ex1_20.c -o current
+cc ex1_20.c -o detab
 #+END_SRC
 
 #+RESULTS:
 
 Test:
 #+BEGIN_SRC sh :exports both :results verbatim
-printf "sdf	a" | ./C_codes/current
+printf "sf	a" | ./C_codes/detab
 #+END_SRC
+
+#+RESULTS:
+: sf  a
+
+***** Exercise 1-21
+We can assume the input stream of =entab= to have no tab characters in it -- if
+it were, we can eliminate those with the =detab=, which we implemented previously.
+
+Here we also approach to this problem that is analogous to previous one. The
+following pseudocode describes our wishful thinking:
+#+BEGIN_SRC C
+while (input character is not end of file)  {
+    if (input eqauls to blank)
+        consume blanks until it encounters with either next tabstop or non-blank character;
+    else copy the input character into the output;
+}
+
+#+END_SRC
+
+#+BEGIN_SRC C :main no :tangle C_codes/ex1_21.c
+#include <stdio.h>
+#define TABSTOP 4               /* Tab stop */
+
+int main() {
+    int c;
+    int ncolumn = 0;
+    int nexttabstop;
+    int nentry;
+
+    c = getchar();
+    while (c != EOF) {
+        if (c == ' ') {
+            nentry = ncolumn;
+            ++ncolumn;
+            nexttabstop = ncolumn + (TABSTOP - (ncolumn % TABSTOP));
+            while ((c = getchar()) == ' ' && ncolumn != nexttabstop) {
+                ++ncolumn;
+            }
+            if (ncolumn == nexttabstop) {
+                putchar('\t');
+            } else {
+                while(nentry != ncolumn) {
+                    putchar(' ');
+                    ++nentry;
+                }
+            }
+        } else {
+            putchar(c);
+            if (c == '\n')
+                ncolumn = 0;
+            else ++ncolumn;
+            c = getchar();
+        }
+    }
+}
+#+END_SRC
+
+Setup test:
+#+BEGIN_SRC sh
+cd C_codes
+cc ex1_21.c -o entab
+#+END_SRC
+
+Test:
+#+BEGIN_SRC sh :exports both :results verbatim
+printf "sf		sdfd	d  a" | ./C_codes/detab  | ./C_codes/entab
+# printf "sfd a\n" | ./C_codes/entab
+# printf "sfd     a" | ./C_codes/entab
+#+END_SRC
+#+RESULTS:
+: sf		sdfd	d  a

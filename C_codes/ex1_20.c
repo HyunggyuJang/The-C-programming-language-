@@ -1,5 +1,5 @@
 #include <stdio.h>
-#define TABSTOP 4                     /* Tab stob */
+#define TABSTOP 4                     /* Tab stop */
 
 int expandtab(int columnIndex);
 
@@ -20,7 +20,6 @@ int main() {
 }
 
 int expandtab(int nc) {
-    int nextColumn;
     if ((nc % TABSTOP) == 0) {
         putchar(' ');
         ++nc;
