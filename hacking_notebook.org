@@ -3,7 +3,12 @@
 :PROPERTIES:
 :NOTER_DOCUMENT: ../Documents/CS/C/Brian W. Kernighan, Dennis M. Ritchie-The ANSI C Programming Language-Prentice Hall (1988).pdf
 :END:
-** Getting Started
+** Chapter 1 - A Tutorial Introduction
+:PROPERTIES:
+:NOTER_PAGE: 9
+:END:
+
+*** Getting Started
 :PROPERTIES:
 :NOTER_PAGE: 9
 :END:
@@ -18,7 +23,7 @@ main(){
 
 #+RESULTS:
 | hello | world |
-*** Exercise 1-1
+**** Exercise 1-1
 :PROPERTIES:
 :NOTER_PAGE: 11
 :END:
@@ -78,7 +83,7 @@ main(){
 
   Now it got quite cryptic -- compiler got spit outs all the errors not the one
   that causes all subsequent errors.
-*** Exercise 1-2
+**** Exercise 1-2
 :PROPERTIES:
 :NOTER_PAGE: 11
 :END:
@@ -95,11 +100,11 @@ main(){
 
 If the character is not on the mentioned list, it just ignore the backslash --
 just return the following character.
-** Variables and Arithmetic Expressions
+*** Variables and Arithmetic Expressions
 :PROPERTIES:
 :NOTER_PAGE: 11
 :END:
-*** Output formatting function -- =printf=
+**** Output formatting function -- =printf=
 :PROPERTIES:
 :NOTER_PAGE: 14
 :END:
@@ -111,7 +116,7 @@ third arguemnt in the place of each =%d=, respectively.
 
 I guess it use =%= as expression to be substituted since this character seems
 like describing the situation where one element being replaced by another.
-*** Exercise 1-3
+**** Exercise 1-3
 :PROPERTIES:
 :NOTER_PAGE: 16
 :END:
@@ -158,7 +163,7 @@ main(){
 |        260 |   126.7 |
 |        280 |   137.8 |
 |        300 |   148.9 |
-*** Exercise 1-4
+**** Exercise 1-4
 :PROPERTIES:
 :NOTER_PAGE: 16
 :END:
@@ -202,11 +207,11 @@ main(){
 |     100 |      212.0 |
 |     110 |      230.0 |
 |     120 |      248.0 |
-** The for statement
+*** The for statement
 :PROPERTIES:
 :NOTER_PAGE: 16
 :END:
-*** Exercise 1-5
+**** Exercise 1-5
 :PROPERTIES:
 :NOTER_PAGE: 17
 :END:
@@ -243,7 +248,7 @@ main(){
 |  40 |   4.4 |
 |  20 |  -6.7 |
 |   0 | -17.8 |
-** Symbolic Constants
+*** Symbolic Constants
 :PROPERTIES:
 :NOTER_PAGE: 17
 :END:
@@ -271,7 +276,7 @@ for (fahr = LOWER; fahr <= UPPER; fahr = fahr + STEP)
 | 260 | 126.7 |
 | 280 | 137.8 |
 | 300 | 148.9 |
-** Character Input and Output
+*** Character Input and Output
 :PROPERTIES:
 :NOTER_PAGE: 18
 :END:
@@ -284,7 +289,7 @@ printf("\ninteger number %d got translated with putchar into %c\n", c, putchar(c
 #+RESULTS:
 |       2 |        |    |     |            |      |         |      |   |
 | integer | number | 50 | got | translated | with | putchar | into | 2 |
-*** File Copying
+**** File Copying
 :PROPERTIES:
 :NOTER_PAGE: 18
 :END:
@@ -315,7 +320,7 @@ any integer number that would not appear in the real character code.
 
 Using this /trick/, we should be alerted that now we should be considerate on
 the /precedence/ issue -- ~!=~ has higher precedence than ~=~.
-**** Exercise 1-6
+***** Exercise 1-6
 :PROPERTIES:
 :NOTER_PAGE: 20
 :END:
@@ -341,7 +346,7 @@ The input character ÿ return 0 via "getchar() != EOF"
 
 From this exercise, we know that character ~^D~ represent =EOF= (also apparently
 0 means the test is false and 1 for the true).
-**** Exercise 1-7
+***** Exercise 1-7
 :PROPERTIES:
 :NOTER_PAGE: 20
 :END:
@@ -353,7 +358,7 @@ putchar(EOF);
 : ÿ
 
 What we discovered in preceding exercise got verified explicitly.
-*** Character Counting
+**** Character Counting
 :PROPERTIES:
 :NOTER_PAGE: 20
 :END:
@@ -376,7 +381,7 @@ printf("%.0f\n", nc);
 
 #+RESULTS:
 : 0
-**** Exercise 1-8
+***** Exercise 1-8
 :PROPERTIES:
 :NOTER_PAGE: 22
 :END:
@@ -401,7 +406,7 @@ printf("The number of blanks, tabs, lines are %ld, %ld, %ld, respectively\n", ns
 
 #+RESULTS:
 | The number of blanks | tabs | lines are 0 | 0 | 0 | respectively |
-**** Exercise 1-9
+***** Exercise 1-9
 :PROPERTIES:
 :NOTER_PAGE: 22
 :END:
@@ -443,7 +448,7 @@ Hi Test thsi    tis   d
 Hi Test thsi tis d
 
 #+END_SRC
-**** Exercise 1-10
+***** Exercise 1-10
 :PROPERTIES:
 :NOTER_PAGE: 22
 :END:
@@ -480,7 +485,7 @@ while ((c = getchar ()) != EOF) {
 ~/org/C_codes [master] λ echo "tab	\	" | ./a.out
 tab\t\\\t\n
 #+END_SRC
-*** Word Counting
+**** Word Counting
 :PROPERTIES:
 :NOTER_PAGE: 22
 :END:
@@ -506,7 +511,7 @@ printf("%d %d %d\n", nl, nw, nc);
 
 #+RESULTS:
 : 0 0 0
-**** Exercise 1-11
+***** Exercise 1-11
 :PROPERTIES:
 :NOTER_PAGE: 23
 :END:
@@ -593,7 +598,7 @@ printf "This is \n compound case.\t" | ./C_codes/current
 | 0 | 0 |  1 |
 | 0 | 1 |  1 |
 | 1 | 4 | 25 |
-**** Exercise 1-12
+***** Exercise 1-12
 :PROPERTIES:
 :NOTER_PAGE: 23
 :END:
@@ -642,11 +647,11 @@ printf "Test words\n\n\n\t\t\t   One Two     Three" | ./C_codes/current
 | One   |
 | Two   |
 | Three |
-** Arrays
+*** Arrays
 :PROPERTIES:
 :NOTER_PAGE: 25
 :END:
-**** Exercise 1-13
+***** Exercise 1-13
 :PROPERTIES:
 :NOTER_PAGE: 25
 :END:
@@ -740,7 +745,7 @@ cat C_codes/ex1_13.c | ./C_codes/current
 |          14 | **                                                 |
 |          17 | *                                                  |
 |          18 | *                                                  |
-**** Exercise 1-14
+***** Exercise 1-14
 :PROPERTIES:
 :NOTER_PAGE: 25
 :END:
@@ -809,7 +814,7 @@ cat C_codes/ex1_14.c | ./C_codes/current
 | w         | **                             |
 | y         | ****                           |
 | z         | ***                            |
-** Functions
+*** Functions
 :PROPERTIES:
 :NOTER_PAGE: 26
 :END:
@@ -839,7 +844,7 @@ int power(int base, int n)
 | power(2 | 5) is 32 |
 
 Yes it works as expected.
-**** Exercise 1-15
+***** Exercise 1-15
 #+BEGIN_SRC C :main no :tangle C_codes/ex1_15.c :exports both
 #include <stdio.h>
 
@@ -879,9 +884,9 @@ float fahr2cels(float fahr) {
 | 260 | 126.7 |
 | 280 | 137.8 |
 | 300 | 148.9 |
-** Call by value
-** Character array
-**** Exercise 1-16
+*** Call by value
+*** Character array
+***** Exercise 1-16
 :PROPERTIES:
 :NOTER_PAGE: 31
 :END:
@@ -1003,7 +1008,7 @@ printf "Test\noverflowed test case longer than twice!\nlike this" | ./C_codes/cu
 #+RESULTS:
 | simple     |      |      |        |      |        |
 | overflowed | test | case | longer | than | twice! |
-**** Exercise 1-17
+***** Exercise 1-17
 :PROPERTIES:
 :NOTER_PAGE: 31
 :END:
@@ -1227,7 +1232,7 @@ printf "Test\noverflowed test case longer than twice!\nlike this" | ./C_codes/cu
 | like       | this |      |        |      |        |
 
 Seems like works well.
-**** Exercise 1-18
+***** Exercise 1-18
 :PROPERTIES:
 :NOTER_PAGE: 31
 :END:
@@ -1438,7 +1443,7 @@ printf "test empty line\n     	\nlike this" | ./C_codes/current
 : like this
 
 Works as expected.
-**** Exercise 1-19
+***** Exercise 1-19
 :PROPERTIES:
 :NOTER_PAGE: 31
 :END:
@@ -1606,8 +1611,8 @@ cc ex1_19.c -o current
 Test:
 #+BEGIN_SRC sh :exports both :results verbatim
 printf "trailings        	\nsimple\nones\n" | ./C_codes/current
-printf "test empty line\n     	\nlike this" | ./C_codes/current
-# printf "Test\noverflowed test case longer than twice!\nlike this" | ./C_codes/current
+printf "test empty line\n     	\nlike this\n" | ./C_codes/current
+printf "Test\noverflowed test case longer than twice!\nlike this\n" | ./C_codes/current
 #+END_SRC
 
 #+RESULTS:
@@ -1616,4 +1621,93 @@ printf "test empty line\n     	\nlike this" | ./C_codes/current
 : seno
 : enil ytpme tset
 :
-: iht ekils
+: siht ekil
+: tseT
+: !eciwt naht regnol esac tset dewolfrevo
+: siht ekil
+*** External Variables and Scope
+:PROPERTIES:
+:NOTER_PAGE: 32
+:END:
+***** Exercise 1-20
+:PROPERTIES:
+:NOTER_PAGE: 34
+:END:
+
+
+Since we assume that =n= does not change during program execution, it's better
+to use symbolic parameter than variable for =n=.
+
+For the designing the behavior, as we don't know prior how many length of line
+would it results when we =detab= the given input, we need to dynamic expand the
+output string like we did in =printOverflowed=; and we will produce the output
+stream by mutating the output string like we did in =copy=.
+
+Or we could achieve the behavior we want by using the strategy used in [[*Exercise 1-9][Exercise
+1-9]].
+
+That is, if the input character is tab, then we expand tab as blanks; otherwise,
+just copy that input into output. Here is the pseudocode:
+#+BEGIN_SRC C
+while (input character is not end of file)  {
+    if (input eqauls to tab)
+        put blanks until (current columns % n) equals to 0;
+    else copy the input character into the output;
+}
+
+#+END_SRC
+So, our program keep track of the current column index as state variable. Here
+is the implementation:
+#+BEGIN_SRC C :main no :tangle C_codes/ex1_20.c
+#include <stdio.h>
+#define TABSTOP 4                     /* Tab stob */
+
+int expandtab(int columnIndex);
+
+int main() {
+    int c;
+    int ncolumn = 0;
+
+    while ((c = getchar()) != EOF) {
+        if (c == '\t')
+            ncolumn = expandtab(ncolumn); /* update column number */
+        else {
+            putchar(c);
+            if (c == '\n')
+                ncolumn = 0;    /* initialize column number */
+            else ++ncolumn;     /* increase column number */
+        }
+    }
+}
+
+int expandtab(int nc) {
+    int nextColumn;
+    if ((nc % TABSTOP) == 0) {
+        putchar(' ');
+        ++nc;
+    }
+    while((nc % TABSTOP) != 0) {
+        putchar(' ');
+        ++nc;
+    }
+    return nc;
+}
+#+END_SRC
+
+We reasoned the next column line number in =expandtab= by observing that it
+should be product of =TABSTOP=; since if the given column index is already
+product of =TABSTOP=, it means we should expand the =tab= until next tabstop in
+this case, we handled this case explicitly.
+
+Setup test:
+#+BEGIN_SRC sh
+cd C_codes
+cc ex1_20.c -o current
+#+END_SRC
+
+#+RESULTS:
+
+Test:
+#+BEGIN_SRC sh :exports both :results verbatim
+printf "sdf	a" | ./C_codes/current
+#+END_SRC
