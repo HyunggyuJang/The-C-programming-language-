@@ -1806,3 +1806,63 @@ would suffice to reach a tab stop -- since in that case, the tab stop character
 should reach one more tabstop than next tabstop. We accomplished this by
 choosing carefully next tab stop -- ~nexttabstop = ncolumn + (TABSTOP - (ncolumn
 % TABSTOP));~, which do the right thing.
+***** Exercise 1-22
+Before go into designing any code or implementation the requested task, first,
+we should make concrete the abstract specification -- it can be seen as part of
+designing in a more large scale.
+
+Here is the summary:
++-------+-------------------------+------------------------------------------------+
+| Cases |        Situation        |                      Want                      |
++-------+-------------------------+------------------------------------------------+
+|     1 | Line contains no blanks |        Fold at n; continue from there.         |
++-------+-------------------------+------------------------------------------------+
+|     2 |    Line less than n     |    No fold; just copy that input to output.    |
++-------+-------------------------+------------------------------------------------+
+|     3 |  Line with only blanks  | Replace current line with line that has first  |
+|       |                         |    non-blank character as its first column     |
+|       |                         |                   character.                   |
++-------+-------------------------+------------------------------------------------+
+|     4 |   Line has word being   | Fold current line so as the next line to start |
+|       |    constructed at n     |   with current word and continue from that.    |
++-------+-------------------------+------------------------------------------------+
+|     5 |  Line has blank being   |Consume all consecutive blanks and then initiate|
+|       |      consumed at n      | next line & if current input is newline, take  |
+|       |                         |      one more character, else do nothing.      |
++-------+-------------------------+------------------------------------------------+
+
+From this, we can observe that to accomplish all of those specifications at the
+same time, we need to keep track of the deferred blanks and deferred non-blank
+character array separately.
+
+Here is the pseudo state transition diagram to implement:
+
+#+BEGIN_SRC dot :exports results :file C_codes/ex1_22.png
+digraph G {
+    subgraph cluster0 {
+        node [shape = doublecircle, label="newline"] newline
+        node [shape = circle, label="IN"] IN
+        node [shape = circle, label="OUT"] OUT
+        IN -> OUT [label = "has deferred blanks?\nflush blanks"]
+        OUT -> IN [label = "has deferred non-blanks?\nflush non-blanks"]
+        IN -> IN [label = "Case 1:"]
+        OUT -> OUT [label = "Case 3:"]
+        {IN, OUT} -> newline [label = "Case 2:"]
+        label = "for column line number < n"
+    }
+    subgraph cluster1 {
+        node [shape = circle, label="IN"] in
+        node [shape = circle, label="OUT"] out
+        in -> out [label = "handover the current deferred non-blanks to next line processor
+                   destroy all the deferred blanks"]
+        out -> in [label = "destory all the defered blanks
+                   continue in next line"]
+        in -> in
+        out -> out
+        label = "for column line number >= n"
+    }
+}
+#+END_SRC
+
+#+RESULTS:
+[[file:C_codes/ex1_22.png]]
