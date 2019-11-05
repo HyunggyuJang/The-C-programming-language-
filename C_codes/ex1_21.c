@@ -30,7 +30,7 @@ int main() {
             if (c == '\n')
                 ncolumn = 0;
             else ++ncolumn;
-            c = getchar();
+            c = getchar();      /* to agree with above if branch */
         }
     }
 }
