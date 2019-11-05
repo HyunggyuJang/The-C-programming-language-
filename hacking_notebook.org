@@ -2157,3 +2157,64 @@ The column line number also agree with this. With current tool kit, the external
 variable effects in a good way since we aren't allowed to use any higher order function.
 
 Now let's turn into another side -- the case where column line number >= n.
+
+#+BEGIN_SRC C
+while (the input character is not end of file character) {
+    if (the column line number is greater than or equals to n) {
+        if (current state is in the word) { /* the current column line number should eqaul to n */
+            if (input character is non-word character) {
+                flush all;
+                initialize deferred blanks;
+                initialize deferred word;
+                print new line character;
+                initialize column line number;
+                set the state OUT;
+            }
+            else if (have flushed in current line) {
+                initialize deferred blanks;
+                print new line character;
+                set the column line number to the current deferred word index;
+            } else {            /* current line densed with all the word character */
+                print character that signal this is the folded line;
+                print new line character;
+                initialize the column line number;
+            }
+        } else {                /* reached via consuming all the blank characters */
+            initialize deferred blanks;
+            if (have flushed in current line) {
+                if (the input character is new line) /* ensure the current input character is word character */
+                    consume until it gets word character;
+                print new line character;
+                initialize column line number;
+            } else {            /* current line has no word character */
+                initialize column line number; /* reuse current line */
+            }
+        }
+    }
+    else if (the input character is newline) { /* Here we only consider the column line number < n */
+        if (current state is in the word) {
+            flush deferred blanks if any;
+            flush deferred word;
+        } else {                /* current state is out of the word */
+            flush deferred word if any;
+            flush deferred blanks;
+        }
+        initialize the deferred blanks;
+        initialize the deferred word;
+        initialize the column line number;
+    }
+    else if (the input character is blank) { /* entry point of white spaces */
+        flush deferred blanks if any;
+        initialize the deferred blanks;
+        defer all the consecutive blanks;
+        set state OUT;
+    }
+    else {                      /* the input character is non-blank character */
+        /* this is the entry point of non-blank characters */
+        flush deferred word if any;
+        initialize the deferred word;
+        defer all the consecutive word characters until column line number less than n; /* changed from before */
+        set state IN;
+    }
+}
+#+END_SRC
