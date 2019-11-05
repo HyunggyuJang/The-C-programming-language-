@@ -2491,3 +2491,33 @@ printf "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" | ./C_codes/current
 Actually our original implementation couldn't cope with this case; from this
 test case, we realized that the =blanks= and =word= string should have length
 =FOLD + 1= not exactly =FOLD= to afford the end of string character.
+***** Exercise 1-23
+#+BEGIN_SRC C
+printf("This is test for the response of C compiler about the ill-typed comment syntax");
+/* like this
+#+END_SRC
+
+So it consume all the subsequent characters after opening comment syntax; all we
+need to do is just discard all the subsequent input characters until the closing
+comment syntax is matched -- =*/=. This is way more simpler task than the one
+just before it.
+
+In state diagram, we can draw what we should implement as follows:
+#+BEGIN_SRC dot :file C_codes/ex1_23.png :exports results
+digraph G {
+    rankdir = LR;
+    node [shape = doublecircle] "normal" "in comment";
+    node [shape = circle];
+    "normal" -> "normal" [label = "copy to output\nother than / character"]
+    "normal" -> "/" [label = "consume /"]
+    "/" -> "normal" [label = "barfage / and copy to output\nother than * character"]
+    "/" -> "in comment" [label = "consume *"]
+    "in comment" -> "in comment" [label = "consume other than * character"]
+    "in comment" -> "*" [label = "consume *"]
+    "*" -> "in comment" [label = "barfage * and copy to output\nother than / character"]
+    "*" -> "normal" [label = "consume /"]
+}
+#+END_SRC
+
+#+RESULTS:
+[[file:C_codes/ex1_23.png]]
