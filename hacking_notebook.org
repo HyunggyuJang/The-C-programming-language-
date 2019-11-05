@@ -2162,7 +2162,7 @@ Now let's turn into another side -- the case where column line number >= n.
 while (the input character is not end of file character) {
     if (the column line number is greater than or equals to n) {
         if (current state is in the word) { /* the current column line number should eqaul to n */
-            if (input character is non-word character) {
+            if (input character is non-word character) { /* actually the actions are same as newline clause's */
                 flush all;
                 initialize deferred blanks;
                 initialize deferred word;
@@ -2175,6 +2175,7 @@ while (the input character is not end of file character) {
                 print new line character;
                 set the column line number to the current deferred word index;
             } else {            /* current line densed with all the word character */
+                flush deferred word;
                 print character that signal this is the folded line;
                 print new line character;
                 initialize the column line number;
@@ -2182,6 +2183,7 @@ while (the input character is not end of file character) {
         } else {                /* reached via consuming all the blank characters */
             initialize deferred blanks;
             if (have flushed in current line) {
+                flush deferred word;
                 if (the input character is new line) /* ensure the current input character is word character */
                     consume until it gets word character;
                 print new line character;
@@ -2218,3 +2220,255 @@ while (the input character is not end of file character) {
     }
 }
 #+END_SRC
+
+You should convince yourself above algorithm cope with all the cases we
+specified above. Then let's code it
+
+#+BEGIN_SRC C :main no :tangle C_codes/ex1_22_complete.c
+#include <stdio.h>
+#define TABSTOP 4               /* Tab stop */
+#define FOLD 20                 /* fold point */
+#define IN 1
+#define OUT 0
+#define TRUE 1
+#define FALSE 0
+
+/* external variables */
+int ncolumn = 0;
+char blanks[FOLD + 1] = "";
+int bInd = 0;
+char word[FOLD + 1] = "";
+int wInd = 0;
+int state = OUT;
+int hasFlushed =  FALSE;
+int c;
+
+void updateColumnWhenBlank(char c) {
+    if (c == '\t')      /* update ncolumn */
+        ncolumn = ncolumn + (TABSTOP - (ncolumn % TABSTOP));
+    else ++ncolumn;
+}
+
+void updateColumnWhenWord(char c) {
+    ++ncolumn;
+}
+
+int isWordCharacter(char c) {
+    return !(c == ' ' || c == '\t' || c == '\n' || c == EOF);
+}
+
+int isBlankCharacter(char c) {
+    return (c == ' ' || c == '\t');
+}
+
+void flushBlanksIfAny(void) {
+    if (bInd > 0) {    /* flush the blanks if any */
+        hasFlushed = TRUE;
+        printf("%s", blanks);
+    }
+}
+
+void flushWordIfAny(void) {
+    if (wInd > 0) {    /* flush the word if any */
+        hasFlushed = TRUE;
+        printf("%s", word);
+    }
+}
+
+void flushAll(void) {
+    if (state == IN) {
+        flushBlanksIfAny();
+        flushWordIfAny();
+    } else {
+        flushWordIfAny();
+        flushBlanksIfAny();
+    }
+}
+
+void deferBlank(char c) {
+    blanks[bInd] = c;
+    ++bInd;
+}
+
+void deferWord(char c) {
+    word[wInd] = c;
+    ++wInd;
+}
+
+void initializeBlanks(void) {
+    bInd = 0;
+}
+
+void initializeWord(void) {
+    wInd = 0;
+}
+
+void initializeColumn(void) {
+    initializeBlanks();
+    initializeWord();
+    hasFlushed = FALSE;
+    state = OUT;           /* update state */
+    ncolumn = 0;
+}
+
+void endOfBlanks(void) {
+    blanks[bInd] = '\0';
+}
+
+void endOfWord(void) {
+    word[wInd] = '\0';
+}
+
+void flushAndContinueInNext(void) {
+    flushAll();
+    initializeColumn();
+    putchar('\n');         /* print newline */
+    c = getchar();         /* consume one character */
+}
+
+void signalFolded(void) {
+    putchar('-');
+}
+
+
+int main() {
+
+    c = getchar();
+    while (c != EOF) {
+        if (ncolumn >= FOLD) {
+            if (state == IN) {
+                if (!isWordCharacter(c))
+                    flushAndContinueInNext();
+                else if (hasFlushed) {
+                    initializeBlanks();
+                    putchar('\n');
+                    ncolumn = wInd;
+                    hasFlushed = FALSE;
+                } else {
+                    flushWordIfAny();
+                    signalFolded();
+                    putchar('\n');
+                    initializeColumn();
+                }
+            } else {
+                if (hasFlushed) {
+                    flushWordIfAny();
+                    if (c == '\n')
+                        while (!isWordCharacter(c = getchar()))
+                            ;
+                    putchar('\n');
+                    initializeColumn();
+                } else {
+                    initializeColumn();
+                }
+            }
+        }
+        else if (isBlankCharacter(c)) {
+            updateColumnWhenBlank(c);
+            flushBlanksIfAny();
+            initializeBlanks();
+            deferBlank(c);
+            while (isBlankCharacter(c = getchar())) { /* consume one more character */
+                updateColumnWhenBlank(c);
+                deferBlank(c);
+            }
+            endOfBlanks();
+            state = OUT;         /* update state */
+        } else if (c == '\n') {
+            flushAndContinueInNext();
+        } else {                   /* input character is non-blank character */
+            updateColumnWhenWord(c);
+            flushWordIfAny();
+            initializeWord();
+            deferWord(c);
+            while (isWordCharacter(c = getchar()) && ncolumn < FOLD) {
+                updateColumnWhenWord(c);
+                deferWord(c);
+            }
+            endOfWord();
+            state = IN;             /* update state */
+        }
+    }
+    flushAll();
+    printf("\nThe current column line number is %d", ncolumn);
+    return 0;
+}
+#+END_SRC
+
+Setup test:
+#+BEGIN_SRC sh
+cd C_codes
+cc ex1_22_complete.c -o current
+#+END_SRC
+
+#+RESULTS:
+Test:
+#+BEGIN_SRC sh :exports both :results verbatim
+printf "This line is really long enough                to overflow the fold limit!!" | ./C_codes/current
+#+END_SRC
+
+#+RESULTS:
+: This line is really
+: long enough
+: to overflow the fold
+: limit!!
+: The current column line number is 7
+
+The above test case was just general case, case 4 and 5, let's try other cases we specified
+above:
+First, the case 2:
+#+BEGIN_SRC sh :exports both :results verbatim
+printf "current should	be" | ./C_codes/current
+#+END_SRC
+#+RESULTS:
+: current should	be
+: The current column line number is 18
+
+Works as expected.
+
+Now case 3:
+#+BEGIN_SRC sh :exports both :results verbatim
+printf "         	           this line replaced" | ./C_codes/current
+#+END_SRC
+
+#+RESULTS:
+: this line replaced
+: The current column line number is 18
+
+If the line is all blanks and has no word it should be what?
+
+#+BEGIN_SRC sh :exports both :results verbatim
+printf "                          " | ./C_codes/current
+#+END_SRC
+
+#+RESULTS:
+:                         "
+: The current column line number is 26
+
+The above one is not what we expected ever. Why such abnormal result happend? If
+we reason through carefully, we came to realize it is due to the overflow of our
+=blanks= character array -- its length limited to =FOLD= but this one obviously
+overflowed that. As we did in =word= case, we should handle the overflow case explicitly.
+
+But the behavior that we wanted in this case implies that we have to dynamically
+expand the =blanks= to cope with just that case; this can be achieved using the
+same strategy with =printOverflowed=; but since this involve dramatic changes in
+current code -- we can't use external variables any more since =blanks= should
+grow dynamically, so external declarations can not cope with that -- so for now
+let us just make informal contraction that blank line ends with end of file
+character should not overflow the given fold point.
+
+Let us continue the rest of cases. The last case -- case 1:
+#+BEGIN_SRC sh :exports both :results verbatim
+printf "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" | ./C_codes/current
+#+END_SRC
+
+#+RESULTS:
+: aaaaaaaaaaaaaaaaaaaa-
+: aaaaaaaaaaaaaaaaaaaa-
+: aaaaaa
+: The current column line number is 6
+
+Actually our original implementation couldn't cope with this case; from this
+test case, we realized that the =blanks= and =word= string should have length
+=FOLD + 1= not exactly =FOLD= to afford the end of string character.
