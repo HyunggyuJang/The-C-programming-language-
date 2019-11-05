@@ -2514,10 +2514,115 @@ digraph G {
     "/" -> "in comment" [label = "consume *"]
     "in comment" -> "in comment" [label = "consume other than * character"]
     "in comment" -> "*" [label = "consume *"]
-    "*" -> "in comment" [label = "barfage * and copy to output\nother than / character"]
+    "*" -> "in comment" [label = "consume other than / character"]
     "*" -> "normal" [label = "consume /"]
 }
 #+END_SRC
 
 #+RESULTS:
 [[file:C_codes/ex1_23.png]]
+
+Let's coding according to this diagram:
+#+BEGIN_SRC C :main no :tangle C_codes/ex1_23.c
+#include <stdio.h>
+#define NORMAL 0
+#define SLASH 1
+#define INCOMMENT 2
+#define ASTERISK 3
+
+int main() {
+    int c;
+    int state = NORMAL;
+    while ((c = getchar()) != EOF) {
+        if (state == NORMAL) {
+            if (c == '/')
+                state = SLASH;
+            else putchar(c);    /* copy the input to output */
+        }
+        else if (state == SLASH) {
+            if (c == '*')
+                state = INCOMMENT;
+            else {
+                putchar('/');   /* barfage / */
+                putchar(c);     /* copy the input to output */
+                state = NORMAL;
+            }
+        }
+        else if (state == INCOMMENT) {
+            if (c == '*')
+                state = ASTERISK;
+        }
+        else if (state == ASTERISK) {
+            if (c == '/')
+                state = NORMAL;
+            else state = INCOMMENT;
+
+        }
+        else {
+            printf("Unknown state %d -- REMOVE_COMMENT", state);
+            return 1;           /* error */
+        }
+    }
+    return 0;
+}
+#+END_SRC
+
+Now let's test! Setup the test:
+#+BEGIN_SRC sh
+cd C_codes
+cc ex1_23.c -o remove_comment
+#+END_SRC
+
+#+RESULTS:
+
+Let feed the source file into the resulting program:
+#+BEGIN_SRC sh :exports both :results verbatim
+cat C_codes/ex1_23.c | ./C_codes/remove_comment
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+#include <stdio.h>
+#define NORMAL 0
+#define SLASH 1
+#define INCOMMENT 2
+#define ASTERISK 3
+
+int main() {
+    int c;
+    int state = NORMAL;
+    while ((c = getchar()) != EOF) {
+        if (state == NORMAL) {
+            if (c == '/')
+                state = SLASH;
+            else putchar(c);
+        }
+        else if (state == SLASH) {
+            if (c == '*')
+                state = INCOMMENT;
+            else {
+                putchar('/');
+                putchar(c);
+                state = NORMAL;
+            }
+        }
+        else if (state == INCOMMENT) {
+            if (c == '*')
+                state = ASTERISK;
+        }
+        else if (state == ASTERISK) {
+            if (c == '/')
+                state = NORMAL;
+            else state = INCOMMENT;
+
+        }
+        else {
+            printf("Unknown state %d -- REMOVE_COMMENT", state);
+            return 1;
+        }
+    }
+    return 0;
+}
+#+end_example
+
+Works as expected.
