@@ -1,11 +1,3 @@
-#include <stdio.h>
-
-
-
-
-
-
-int main() {
 int c, i, j;
 int length = 'z' - 'a' + 1;
 int nchars[length];
@@ -26,6 +18,4 @@ for (i = 0; i < length; ++i) {
             putchar('*');
         putchar('\n');
     }
-}
-return 0;
 }

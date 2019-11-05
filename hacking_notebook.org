@@ -1724,10 +1724,22 @@ it were, we can eliminate those with the =detab=, which we implemented previousl
 Here we also approach to this problem that is analogous to previous one. The
 following pseudocode describes our wishful thinking:
 #+BEGIN_SRC C
-while (input character is not end of file)  {
-    if (input eqauls to blank)
-        consume blanks until it encounters with either next tabstop or non-blank character;
-    else copy the input character into the output;
+while (the input character is not end of file)  {
+    if (input eqauls to blank) {
+        consume blanks until it encounters with either next tabstop
+            or non-blank character with updating the column line number
+            appropriately;
+        if (column line is next tabstop)
+            print tab character;
+        else barfage all the currently consumed blanks /* current input character consumed */
+                 }
+    else {                      /* non-blanck character */
+        copy the input character into the output;
+        if (the input character is newline character)
+            initialize the column line number -- start with next line;
+        else increase column line number by one;
+        consume one input character to agree with above if branch;
+    }
 }
 
 #+END_SRC
@@ -1748,11 +1760,12 @@ int main() {
             nentry = ncolumn;
             ++ncolumn;
             nexttabstop = ncolumn + (TABSTOP - (ncolumn % TABSTOP));
-            while ((c = getchar()) == ' ' && ncolumn != nexttabstop) {
+            while (ncolumn != nexttabstop && (c = getchar()) == ' ') {
                 ++ncolumn;
             }
             if (ncolumn == nexttabstop) {
                 putchar('\t');
+                c = getchar();  /* to agree with next branch */
             } else {
                 while(nentry != ncolumn) {
                     putchar(' ');
@@ -1764,7 +1777,7 @@ int main() {
             if (c == '\n')
                 ncolumn = 0;
             else ++ncolumn;
-            c = getchar();
+            c = getchar();      /* to agree with above if branch */
         }
     }
 }
@@ -1776,11 +1789,20 @@ cd C_codes
 cc ex1_21.c -o entab
 #+END_SRC
 
+#+RESULTS:
+
 Test:
 #+BEGIN_SRC sh :exports both :results verbatim
-printf "sf		sdfd	d  a" | ./C_codes/detab  | ./C_codes/entab
+# printf "sf		sdfd	d  a" | ./C_codes/detab  | ./C_codes/entab
 # printf "sfd a\n" | ./C_codes/entab
-# printf "sfd     a" | ./C_codes/entab
+printf "sfd     a" | ./C_codes/entab
 #+END_SRC
 #+RESULTS:
-: sf		sdfd	d  a
+: sfd	a
+
+It agree with my text editor -- Emacs; actually in this environment, we can not
+face with the case posed in the statement -- when either a tab or a single blank
+would suffice to reach a tab stop -- since in that case, the tab stop character
+should reach one more tabstop than next tabstop. We accomplished this by
+choosing carefully next tab stop -- ~nexttabstop = ncolumn + (TABSTOP - (ncolumn
+% TABSTOP));~, which do the right thing.

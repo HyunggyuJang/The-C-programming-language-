@@ -13,11 +13,12 @@ int main() {
             nentry = ncolumn;
             ++ncolumn;
             nexttabstop = ncolumn + (TABSTOP - (ncolumn % TABSTOP));
-            while ((c = getchar()) == ' ' && ncolumn != nexttabstop) {
+            while (ncolumn != nexttabstop && (c = getchar()) == ' ') {
                 ++ncolumn;
             }
             if (ncolumn == nexttabstop) {
                 putchar('\t');
+                c = getchar();  /* to agree with next branch */
             } else {
                 while(nentry != ncolumn) {
                     putchar(' ');
