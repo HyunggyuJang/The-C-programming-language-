@@ -141,11 +141,15 @@ int main() {
             flushBlanksIfAny();
             initializeBlanks();
             deferBlank(c);
-            while (isBlankCharacter(c = getchar())) { /* consume one more character */
+            while (isBlankCharacter(c = getchar()) && ncolumn < FOLD) { /* consume one more character */
                 updateColumnWhenBlank(c);
                 deferBlank(c);
             }
             endOfBlanks();
+            while (isBlankCharacter(c)) { /* consume overflowed blanks */
+                c = getchar();
+                updateColumnWhenBlank(c);
+            }
             state = OUT;         /* update state */
         } else if (c == '\n') {
             flushAndContinueInNext();
