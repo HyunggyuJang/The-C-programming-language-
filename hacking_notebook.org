@@ -1839,18 +1839,10 @@ Here is the pseudo state transition diagram to implement:
 
 #+BEGIN_SRC dot :exports results :file C_codes/ex1_22.png
 digraph G {
-    subgraph cluster0 {
-        node [shape = doublecircle, label="newline"] newline
-        node [shape = circle, label="IN"] IN
-        node [shape = circle, label="OUT"] OUT
-        IN -> OUT [label = "has deferred blanks?\nflush blanks", constraint = false]
-        OUT -> IN [label = "has deferred non-blanks?\nflush non-blanks", constraint = false]
-        IN -> IN [label = "Case 1:"]
-        OUT -> OUT [label = "Case 3:"]
-        {IN, OUT} -> newline [label = "Case 2:"]
-        label = "for column line number < n"
-    }
+    rankdir = LR;
     subgraph cluster1 {
+        style = filled
+        color = lightgrey
         node [shape = circle, label="IN"] in
         node [shape = circle, label="OUT"] out
         in -> out [label = "Case 4:
@@ -1860,6 +1852,18 @@ digraph G {
                    destory all the defered blanks
                    continue in next line"]
         label = "for column line number >= n"
+    }
+    subgraph cluster0 {
+        color = white
+        node [shape = doublecircle, label="newline"] newline
+        node [shape = circle, label="IN"] IN
+        node [shape = circle, label="OUT"] OUT
+        IN -> OUT [label = "consume blank character\nflush blanks"]
+        OUT -> IN [label = "consume word character\nflush word"]
+        IN -> in [label = "Case 1:"]
+        OUT -> out [label = "Case 3:"]
+        {IN, OUT} -> newline [label = "Case 2:"]
+        label = "for column line number < n"
     }
 }
 #+END_SRC
@@ -2468,6 +2472,40 @@ perspective. That is, the current version modifies invalid memory -- the
 overflowed index -- which can cause unexpected result. I've reflected those
 changes in above code (for whom having curiosity about that change, see the git
 diff for that). Now the above test case return only 20 blanks no more unexpected one.
+
+Now here is the final state diagram we have implemented:
+#+BEGIN_SRC dot :exports results :file C_codes/ex1_22_final.png
+digraph G {
+    rankdir = LR;
+    label = "for input character is not end of file"
+    color = black
+    subgraph cluster1 {
+        style = filled
+        color = lightgrey
+        node [style=filled, color = white]
+        node [shape = circle, label="IN"] in
+        node [shape = circle, label="OUT"] out
+        in -> out [label = "handover the current deferred non-blanks to next line processor\ndestroy all the deferred blanks"]
+        out -> in [label = "destory all the defered blanks\ncontinue in next line"]
+        label = "for column line number >= n"
+    }
+    subgraph cluster0 {
+        color = white
+        node [shape = doublecircle, label="newline"] newline
+        node [shape = circle, label="IN"] IN
+        node [shape = circle, label="OUT"] OUT
+        IN -> OUT [label = "consume blank character\nflush blanks"]
+        OUT -> IN [label = "consume word character\nflush word"]
+        IN -> in [label = "column number >= n\nhand over the control"]
+        OUT -> out [label = "column number >= n\nconsume all the consecutive blanks -- do not defer"]
+        {IN, OUT} -> newline [label = "flush all deferred string;setup next line"]
+        label = "for column line number < n"
+    }
+}
+#+END_SRC
+
+#+RESULTS:
+[[file:C_codes/ex1_22_final.png]]
 
 #+BEGIN_SRC sh :exports both :results verbatim
 printf "                          " | ./C_codes/current
