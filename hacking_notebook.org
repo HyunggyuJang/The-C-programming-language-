@@ -2485,8 +2485,9 @@ digraph G {
         node [style=filled, color = white]
         node [shape = circle, label="IN"] in
         node [shape = circle, label="OUT"] out
-        in -> out [label = "handover the current deferred non-blanks to next line processor\ndestroy all the deferred blanks"]
-        out -> in [label = "destory all the defered blanks\ncontinue in next line"]
+        in -> out [label = "/handover the current deferred non-blanks to next line processor\ndestroy all the deferred blanks"]
+        in -> in [label = "has not flushed\n/flush word in current line\nsiganl this line folded\ncontinue in next line"]
+        out -> in [label = "/destory all the defered blanks\ncontinue in next line"]
         label = "for column line number >= n"
     }
     subgraph cluster0 {
@@ -2494,11 +2495,11 @@ digraph G {
         node [shape = doublecircle, label="newline"] newline
         node [shape = circle, label="IN"] IN
         node [shape = circle, label="OUT"] OUT
-        IN -> OUT [label = "consume blank character\nflush blanks"]
-        OUT -> IN [label = "consume word character\nflush word"]
-        IN -> in [label = "column number >= n\nhand over the control"]
-        OUT -> out [label = "column number >= n\nconsume all the consecutive blanks -- do not defer"]
-        {IN, OUT} -> newline [label = "flush all deferred string;setup next line"]
+        IN -> OUT [label = "consume blank character\n/flush blanks"]
+        OUT -> IN [label = "consume word character\n/flush word"]
+        IN -> in [label = "column number >= n\n/hand over the control"]
+        OUT -> out [label = "column number >= n\n/consume all the consecutive blanks -- do not defer"]
+        {IN, OUT} -> newline [label = "/flush all deferred string;setup next line"]
         label = "for column line number < n"
     }
 }
@@ -2664,3 +2665,200 @@ int main() {
 #+end_example
 
 Works as expected.
+***** Exercise 1-24
+We can classify what we should handle into three parts:
+- Syntax that can nest:
+  1. parenthesis;
+  2. brackets;
+  3. braces;
+- Syntax that can not nest:
+  1. single quotes;
+  2. double quotes;
+  3. comments;
+- Syntax should be treated specially:
+  - escape sequences.
+
+
+Let's think about the behavior our program should have: The specifications we
+should implement.
+
+For the syntax that can nest, we want to think as
+
+| Okay case | Ill-defined syntax |
+| =[{()}]=  | =[{]}=             |
+
+This example implies that we need to use /stack/ to hold these nested
+expressions to check their possible syntax errors.
+
+Stack is the dynamically evolving data structure. However, the only data
+structure we have, which contains other expressions in it, is array and that
+should be allocated when it is defined in source code, which in turn compiled
+and then would be executed; once it defined the array object can not be altered
+in their length, so it does not have dynamic process in itself.
+
+To handle this unfortunate, we should notice that this situation is somewhat
+familiar; this is exactly same problem we encountered [[*Exercise 1-16][Exercise 1-16]]; but we are
+better than then -- now we can use the external variables to wire the
+subroutines. Using this combination, we can achevie what we wanted rather
+straightforward manner.
+
+As usual, we first figure out what state diagram we want to achieve given task.
+For now, we are going to assume that we have stack object to store the nested
+bracket things. Then our state specification got simplified: All we need to
+keep track of is current state -- in parenthesis or bracket or brace or single
+quote or double quote or comment or escape sequences.
+
+The only difference between the expression that can nest or not is that the
+nestable expression is current state and another opening syntax consumed, the
+current state should be the one encountered syntax and the previous expression
+should be stored in stack on the top; on the other hand, if the expression can
+not be nested is current state, then the subsequent expression other than
+closing expression of the current syntax state are just consumed or, in other
+word, ignored.
+
+For the matching the paired syntax is same in both; if stack is not empty after
+matching the paired syntax, set the current state to be the one popped from the
+stack; if it is empty set the state same as start.
+
+For the special syntax -- escape sequence -- we assume that escape sequence
+should consist of two character, backslash to start the sequence and the
+following whatever character; this is the only case we have encountered so far.
+And we should ensure the escape sequence only occurs in quoted syntax (and in
+comment since the inner character in comments are stripped when it handed to
+compiler).
+
+Also note that we can include single quotes in double quote syntax but the
+opposed case works in unexpected as explained as follows.
+
+#+BEGIN_SRC C :exports both
+printf("'hi'");               /* \n */
+#+END_SRC
+
+#+RESULTS:
+: 'hi'
+
+#+BEGIN_SRC C :exports both
+printf("%c", '"hello"');
+#+END_SRC
+
+#+RESULTS:
+
+Or if we include more than one characters in between single quotes, we got
+
+#+BEGIN_SRC C :exports both :results verbatim
+printf("%c", 'hello');
+#+END_SRC
+
+#+RESULTS:
+: o
+
+only the last character as value.
+
+Now we ready to draw the state diagram:
+#+BEGIN_SRC dot :file C_codes/ex1_24.png :exports results
+digraph G {
+    rankdir = LR
+    label = "While the character is not end of file"
+    node[shape = circle]
+    start -> nestable [label = "consume opening nestable character"]
+    start -> quoted [label = "consume opening quote character"]
+    start -> comment [label = "consume opening comment syntax sequence"]
+    comment -> start [label = "consume closing comment syntax sequence;\nstack is empty"]
+    comment -> nestable [label = "consume closing comment syntax sequence;\nstack is not empty"]
+    comment -> comment [label = "consume other than\nclosing comment \nsyntax sequence"]
+    start -> start [label = "consume other than special character"]
+    quoted -> nestable [label = "consume matched \nquote character;\nstack is not empty"]
+    quoted -> quoted [label = "consume other than matched quote character and backslash"]
+    quoted -> escape [label = "consume backslash"]
+    escape -> quoted [label = "consume one character;\nback to the previous quoted state"]
+    quoted -> start [label = "consume matched quote character; stack is empty"]
+    nestable -> nestable [label = "consume matched nestable character; stack is not empty"]
+    nestable -> start [label = "consume matched character;\nstack is empty"]
+    nestable -> nestable [label = "consume another opening nestable character / push current state into the stack"]
+    nestable -> nestable [label = "consume normal character -- nor quote, nestable, backslash, comment"]
+    nestable -> comment [label = "consume opening comment character"]
+    nestable -> quoted [label = "consume opening quoted character"]
+}
+#+END_SRC
+
+#+RESULTS:
+[[file:C_codes/ex1_24.png]]
+
+And here is the skeleton of code:
+#+BEGIN_SRC C :main no :tangle C_codes/ex1_24.c
+#include <stdio.h>
+
+int main() {
+    int c = getchar();
+    char state;
+    while (c != EOF) {
+        if (state == START) {
+            if (isOpeningQuote(c) || isOpeningNestable(c) || isTransientOpeningComment(c))
+                state = c;
+
+            else if (isOpeningEscape(c)){
+                return error(c);
+            }
+            c = getchar();
+        }
+        else if (isTransientOpeningComment(state)) { /* no consumption of character just set the state */
+            if (c == '*')
+                state = INCOMMENT;
+            else {
+                if (isEmptyStack())
+                    state = START;
+                else
+                    state = pop();
+            }
+        }
+        else if (isTransientClosingComment(state)) { /* same as above since these are transient state */
+            if (c == '/') {
+                if (isEmptyStack())
+                    state = START;
+                else
+                    state = pop();
+            }
+            else
+                state = INCOMMENT;
+        }
+        else if (state == INCOMMENT) {
+            if (isTransientClosingComment(c))
+                state = c;
+            c = getchar();
+        }
+        else if (isOpeningNestable(state)) {
+            if (isOpeningNestable(c) || isOpeningQuote(c) || isTransientOpeningComment(c)) {
+                push(state);    /* Push current state to stack */
+                state = c;      /* update current */
+            }
+            else if (isMatched(state, c)) {
+                if (isEmptyStack())
+                    state = START;
+                else
+                    state = pop(); /* Pop from current stack if not empty */
+            }
+            else if (isOpeningEscape(c)) {
+                return error(c);
+            }
+            c = getchar();
+        }
+        else if (isOpeningQuote(state)) {
+            if (isMatched(state, c)) {
+                if (isEmptyStack())
+                    state = START;
+                else
+                    state = pop(); /* Pop from current stack if not empty */
+            }
+            else if (isOpeningEscape(c)) {
+                if ((c = getchar()) == EOF) {
+                    return error(c);
+                }
+            }
+            c = getchar();
+        }
+        else                    /* defensive programming */
+            return error(c);
+    }
+    return 0;
+}
+#+END_SRC
