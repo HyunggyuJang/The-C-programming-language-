@@ -1716,7 +1716,6 @@ printf "sf	a" | ./C_codes/detab
 
 #+RESULTS:
 : sf  a
-
 ***** Exercise 1-21
 We can assume the input stream of =entab= to have no tab characters in it -- if
 it were, we can eliminate those with the =detab=, which we implemented previously.
@@ -3076,3 +3075,80 @@ do that; it is not worth to do. However it is worth to notice that we can
 implement the behavior of dynamic stack even with current toolkit although it is
 very dirty to read and all the guts of stack leaks out and spoils all other
 almost irrelevant code.
+** Chapter 2: Types, Operators, and Expressions
+:PROPERTIES:
+:NOTER_PAGE: 35
+:END:
+*** Variable Names
+*** Data Types and Sizes
+**** Exercise 2-1
+:PROPERTIES:
+:NOTER_PAGE: 36
+:END:
+First, let's use the standard headers =<limits.h>= and =<float.h>= to find out
+the ranges. If we reference the Appendix B to find out those, we came to code as
+follows.
+#+BEGIN_SRC C :includes <limits.h> <float.h> :results verbatim :exports both
+printf("The char type's bits is %d\n", CHAR_BIT);
+printf("The char type's minimum value is %d\n", CHAR_MIN);
+printf("The char type's maximum value is %d\n", CHAR_MAX);
+printf("So the unsigned maximum value of char type is %d\n", UCHAR_MAX);
+printf("And the unsigned minimum value of char type is %d\n", 0);
+
+printf("\nThe int type's minimum value is %d\n", INT_MIN);
+printf("The int type's maximum value is %d\n", INT_MAX);
+printf("So the unsigned maximum value of int type is %ld\n", UINT_MAX);
+
+printf("\nThe short type's minimum value is %d\n", SHRT_MIN);
+printf("The short type's maximum value is %d\n", SHRT_MAX);
+printf("So the unsigned maximum value of short type is %u\n", USHRT_MAX);
+
+printf("\nThe long type's minimum value is %ld\n", LONG_MIN);
+printf("The long type's maximum value is %ld\n", LONG_MAX);
+printf("So the unsigned maximum value of long type is %lu\n", ULONG_MAX);
+
+printf("\nThe radix of exponent is %d\n", FLT_RADIX);
+
+printf("\nThe float type's minimum value is %le\n", FLT_MIN);
+printf("The float type's maximum value is %le\n", FLT_MAX);
+printf("The float type's decimal digits of precision is %d\n", FLT_DIG);
+printf("The float type's smallest number to determine whether two number is same is %le\n", FLT_EPSILON);
+
+printf("\nThe double type's minimum value is %le\n", DBL_MIN);
+printf("The double type's maximum value is %le\n", DBL_MAX);
+printf("The double type's decimal digits of precision is %d\n", DBL_DIG);
+printf("The double type's smallest number to determine whether two number is same is %le\n", DBL_EPSILON);
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+The char type's bits is 8
+The char type's minimum value is -128
+The char type's maximum value is 127
+So the unsigned maximum value of char type is 255
+And the unsigned minimum value of char type is 0
+
+The int type's minimum value is -2147483648
+The int type's maximum value is 2147483647
+So the unsigned maximum value of int type is 4294967295
+
+The short type's minimum value is -32768
+The short type's maximum value is 32767
+So the unsigned maximum value of short type is 65535
+
+The long type's minimum value is -9223372036854775808
+The long type's maximum value is 9223372036854775807
+So the unsigned maximum value of long type is 18446744073709551615
+
+The radix of exponent is 2
+
+The float type's minimum value is 1.175494e-38
+The float type's maximum value is 3.402823e+38
+The float type's decimal digits of precision is 6
+The float type's smallest number to determine whether two number is same is 1.192093e-07
+
+The double type's minimum value is 2.225074e-308
+The double type's maximum value is 1.797693e+308
+The double type's decimal digits of precision is 15
+The double type's smallest number to determine whether two number is same is 2.220446e-16
+#+end_example
