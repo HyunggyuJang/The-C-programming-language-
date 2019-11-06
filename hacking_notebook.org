@@ -2785,12 +2785,12 @@ digraph G {
 [[file:C_codes/ex1_24.png]]
 
 And here is the skeleton of code:
-#+BEGIN_SRC C :main no :tangle C_codes/ex1_24.c
+#+BEGIN_SRC C :main no
 #include <stdio.h>
 
 int main() {
     int c = getchar();
-    char state;
+    int state;
     while (c != EOF) {
         if (state == START) {
             if (isOpeningQuote(c) || isOpeningNestable(c) || isTransientOpeningComment(c))
@@ -2837,7 +2837,7 @@ int main() {
                 else
                     state = pop(); /* Pop from current stack if not empty */
             }
-            else if (isOpeningEscape(c)) {
+            else if (isOpeningEscape(c) || isClosingNestable(c)) {
                 return error(c);
             }
             c = getchar();
@@ -2862,3 +2862,217 @@ int main() {
     return 0;
 }
 #+END_SRC
+
+We have to implement each operations we have assumed in above skeleton code.
+Except the stack operations, the implementation would be straightforward. For
+the test what we've implemented so far, let us replace the stack with static
+array -- stack with maximum depth.
+
+#+BEGIN_SRC C :main no :tangle C_codes/ex1_24.c
+#include <stdio.h>
+
+#define START 0
+#define INCOMMENT 1
+#define MAXIMUMDEPTH 1000
+
+/* external varaible -- static stack */
+char stack[MAXIMUMDEPTH];
+int sp = 0;                     /* current stack point */
+
+int isEmptyStack(void) {
+    return sp == 0;
+}
+
+char pop(void) {
+    --sp;
+    return stack[sp];
+}
+
+void push(char c) {
+    stack[sp] = c;
+    ++sp;
+}
+
+int error(char c) {
+    printf("Unexpected character %c encountered", c);
+    return 0;
+}
+
+int isOpeningQuote(char c) {
+    return c == '\'' || c == '"';
+}
+
+int isOpeningNestable(char c) {
+    return c == '{' || c == '[' || c == '(';
+}
+
+int isClosingNestable(char c) {
+    return c == '}' || c == ']' || c == ')';
+}
+
+int isTransientOpeningComment(char c) {
+    return c == '/';
+}
+
+int isOpeningEscape(char c) {
+    return c == '\\';
+}
+
+int isTransientClosingComment(char c) {
+    return c == '*';
+}
+
+int isMatched(char o, char c) {
+    if (o == '{')
+        return c == '}';
+    else if (o == '(')
+        return c == ')';
+    else if (o == '[')
+        return c == ']';
+    else if (isOpeningQuote(o))
+        return c == o;
+    else
+        return 0;
+}
+
+int main() {
+    int c = getchar();
+    int state = START;
+    while (c != EOF) {
+        if (state == START) {
+            if (isOpeningQuote(c) || isOpeningNestable(c) || isTransientOpeningComment(c))
+                state = c;
+
+            else if (isOpeningEscape(c)){
+                return error(c);
+            }
+            c = getchar();
+        }
+        else if (isTransientOpeningComment(state)) { /* no consumption of character just set the state */
+            if (c == '*')
+                state = INCOMMENT;
+            else {
+                if (isEmptyStack())
+                    state = START;
+                else
+                    state = pop();
+            }
+        }
+        else if (isTransientClosingComment(state)) { /* same as above since these are transient state */
+            if (c == '/') {
+                if (isEmptyStack())
+                    state = START;
+                else
+                    state = pop();
+            }
+            else
+                state = INCOMMENT;
+        }
+        else if (state == INCOMMENT) {
+            if (isTransientClosingComment(c))
+                state = c;
+            c = getchar();
+        }
+        else if (isOpeningNestable(state)) {
+            if (isOpeningNestable(c) || isOpeningQuote(c) || isTransientOpeningComment(c)) {
+                push(state);    /* Push current state to stack */
+                state = c;      /* update current */
+            }
+            else if (isMatched(state, c)) {
+                if (isEmptyStack())
+                    state = START;
+                else
+                    state = pop(); /* Pop from current stack if not empty */
+            }
+            else if (isOpeningEscape(c) || isClosingNestable(c)) {
+                return error(c);
+            }
+            c = getchar();
+        }
+        else if (isOpeningQuote(state)) {
+            if (isMatched(state, c)) {
+                if (isEmptyStack())
+                    state = START;
+                else
+                    state = pop(); /* Pop from current stack if not empty */
+            }
+            else if (isOpeningEscape(c)) {
+                if ((c = getchar()) == EOF) {
+                    return error(c);
+                }
+            }
+            c = getchar();
+        }
+        else                    /* defensive programming */
+            return error(c);
+    }
+    if (!isEmptyStack()) {
+        stack[sp + 1] = '\0';       /* for printing */
+        printf("The stacked nestables are unmatched %s", stack);
+    }
+    return 0;
+}
+#+END_SRC
+
+Then let's test!
+
+Setup the test:
+#+BEGIN_SRC sh
+cd C_codes
+cc ex1_24.c -o current
+#+END_SRC
+
+#+RESULTS:
+
+Then test:
+#+BEGIN_SRC sh :exports both
+cat C_codes/ex1_24.c | ./C_codes/current
+#+END_SRC
+
+#+RESULTS:
+
+Unexpected closing syntax case:
+#+BEGIN_SRC sh :exports both
+printf "{[}]" | ./C_codes/current
+#+END_SRC
+
+#+RESULTS:
+: Unexpected character } encountered
+
+General case (well typed syntax):
+#+BEGIN_SRC sh :exports both
+printf "{([({\'\\x\'})])}" | ./C_codes/current
+#+END_SRC
+
+#+RESULTS:
+
+Unmatched quoted syntax case:
+#+BEGIN_SRC sh :exports both
+printf "{([({\'\\x})])}" | ./C_codes/current
+#+END_SRC
+
+#+RESULTS:
+: The stacked nestables are unmatched {([({
+
+Unconsumed nested syntax case:
+#+BEGIN_SRC sh :exports both
+printf "{([({\'\\x\'})]" | ./C_codes/current
+#+END_SRC
+
+#+RESULTS:
+: The stacked nestables are unmatched {(
+
+#+BEGIN_SRC sh :exports both
+printf "{([({\'\\x\'/*})]*/})])}" | ./C_codes/current
+#+END_SRC
+
+#+RESULTS:
+
+Now we think of the dynamic stack implementation. This is almost same as
+[[*Exercise
+1-16][Exercise 1-16]]; this implementation is dirty as those. We should destroy all the
+modular function code. I don't want to get bogged down with the gory details to
+do that; it is not worth to do. However it is worth to notice that we can
+implement the behavior of dynamic stack even with current toolkit although it is
+very dirty to read and all the guts of stack leaks out and spoils all other
+almost irrelevant code.

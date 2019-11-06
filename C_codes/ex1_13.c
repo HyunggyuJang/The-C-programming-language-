@@ -1,3 +1,14 @@
+#include <stdio.h>
+#define IN 1
+#define OUT 0
+#define MAX_LENG 100
+
+
+
+
+
+int main() {
+
 int c, i, j, wl, state;
 int nwords[MAX_LENG];
 
@@ -32,4 +43,6 @@ for (i = 0; i < MAX_LENG; ++i) {
             putchar('*');
         putchar('\n');
     }
+}
+return 0;
 }
