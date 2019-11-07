@@ -3527,9 +3527,8 @@ above assertion fails. So we need to use =unsigned= rather than =int= in
 #+BEGIN_SRC C :main no :includes <stdio.h> :exports both
 int rightrot(unsigned int x, int n) {
     int intBits = 8 * sizeof(int);
-    int rotatingN = n % intBits;
-    unsigned int wrapped = ~(~0 << rotatingN) & x;
-    return (x >> rotatingN) | (wrapped << (intBits - rotatingN));
+    int rotatingN = n % intBits; /* to deal with the numbers greater than bits */
+    return (x >> rotatingN) | (x << (intBits - rotatingN));
 }
 
 int main(void) {
@@ -3542,3 +3541,49 @@ int main(void) {
 
 #+RESULTS:
 : The integer 1 should be same as 1
+
+We have coped with the overflowed shifting number in the above final implementation.
+*** Assignment Operators and Expressions
+**** Exercise 2-9
+:PROPERTIES:
+:NOTER_PAGE: 48
+:END:
+
+Here we try to prove the observation by case analysis:
+- If the rightmost 1 bit positions at n > 0, and let =x= be
+  /X_{n}...X_{0}10...0/ then =x-1= is represented in two's complement number
+  system as /X_{n}...X_{0}01...1/; so =x & x-1= be /X_{n}...X_{0}00...0/ as
+  asserted;
+- if the rightmost 1 bit positions at n = 0, and let =x= be
+  /X_{n}...X_{0}1/ then =x-1= is represented in two's complement number system
+  as /X_{n}...X_{0}0/; so =x & x-1= be /X_{n}...X_{0}0/ as asserted;
+- finally, if there is no rightmost 1 bit, that is, 0 represented in two's
+  complement number system, =x= is represented as /0...0/ and =x-1= is
+  represented /1...1/; so =x & x-1= be /0...0/ as asserted.
+
+
+As we proved the observation (although in informal manner), we are good to use
+this fact to improve the efficiency of program:
+#+BEGIN_SRC C :main no
+/* bitcount: count 1 bits in x */
+int bitcount(unsigned x) {
+    int b;
+
+    for (b = 0; x != 0; x &= x - 1)
+        ++b;
+    return b;
+}
+#+END_SRC
+
+Now the loop executed =b= times rather than the index of leftmost 1 bit times.
+*** Conditional Expressions
+:PROPERTIES:
+:NOTER_PAGE: 49
+:END:
+
+**** Exercise 2-10
+#+BEGIN_SRC C :main no
+int lower(int c) {
+    return (c >= 'A' && c <= 'Z' ? c + 'a' - 'A' : c);
+}
+#+END_SRC
