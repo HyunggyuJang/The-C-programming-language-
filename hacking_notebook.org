@@ -3293,3 +3293,56 @@ for (i = 0; !flag; ++i) {
     } else flag = 1;
 }
 #+END_SRC
+*** Type Conversions
+:PROPERTIES:
+:NOTER_PAGE: 41
+:END:
+**** Exercise 2-3
+This function would be analogous to =atoi=; but involving more subtle details.
+1. It should consume character representing "0x" or "0X";
+2. then it should take character representing decimal digits in addition to
+   alphabets 'a' to 'f' and also 'A' to 'F';
+3. the rest is almost same process as =atoi=.
+
+
+Here is the code do the works:
+#+BEGIN_SRC C :main no :includes <stdio.h> :exports both :results verbatim
+int isDecimalCharacter(int c) {
+    return c >= '0' && c <= '9';
+}
+int isHexaDecimalCharacter(int c) {
+    return isDecimalCharacter(c)
+        || c >= 'a' && c <= 'f'
+        || c >= 'A' && c <= 'F';
+}
+
+int hexToInt(int c) {
+    if (isDecimalCharacter(c))
+        return c - '0';
+    else if (c >= 'a' && c <= 'f')
+        return c - 'a' + 10;
+    else
+        return c - 'A' + 10;
+}
+
+/* htoi: convert s which representing hexadecial number to integer */
+int htoi(char s[])
+{
+    int i, n;
+
+    n = 0;
+    if (s[0] == '0' && (s[1] == 'x' || s[1] == 'X')) /* check the first two character */
+        for (i = 2; isHexaDecimalCharacter(s[i]); ++i)
+            n = 16 * n + hexToInt(s[i]);
+    return n;
+}
+
+int main(void) {
+    char hex[] = "0xffff";      /* should be 65535 */
+    printf("The hexadecial string %s got converted as %d", hex, htoi(hex));
+    return 0;
+}
+#+END_SRC
+
+#+RESULTS:
+: The hexadecial string 0xffff got converted as 65535
