@@ -3152,3 +3152,75 @@ The double type's maximum value is 1.797693e+308
 The double type's decimal digits of precision is 15
 The double type's smallest number to determine whether two number is same is 2.220446e-16
 #+end_example
+
+The process via the direct computation, we need to figure out the method to
+detect overflow; by assuming that method at our disposal, we can detect allowed
+maximum and minimum number of given type only using arithmetic operations.
+
+As we know every data in computer should be represented as bits, in principle,
+we can compare the order of any two data if they are in same type. And our
+language has no run-time support for overflow, we can assume (or experiment) it
+would be wrapped around the limitation, that is, just to ignore the overflowed bit.
+
+Using this observation, we can detect the limitation of number not to be
+overflow; this threadhold number is the maximum number in that type.
+
+It's enough word to describe in abstract manner. Now let's turn to concrete code:
+#+BEGIN_SRC C :results verbatim :exports both
+char c;
+char o;
+o = 0;
+c = 1;
+while (o < c)
+    o = c++;
+printf("The char type's maximum value is %d\n", o);
+printf("And the overflowed number got wrapped as %d\n", c);
+
+printf("\nActually this wrapped number is the minimum number of type char. We can show this by\n...");
+
+o = 1;
+c = 0;
+while (o > c)
+    o = c--;
+printf("\nThe char type's minimum value is %d\n", o);
+printf("And the underflowed number got wrapped as %d\n", c);
+#+END_SRC
+
+#+RESULTS:
+: The char type's maximum value is 127
+: And the overflowed number got wrapped as -128
+:
+: Actually this wrapped number is the minimum number of type char. We can show this by
+: ...
+: The char type's minimum value is -128
+: And the underflowed number got wrapped as 127
+
+Using this process, we can get those of =int= type:
+#+BEGIN_SRC C :results verbatim :exports both
+int c;
+int o;
+o = 0;
+c = 1;
+while (o < c)
+    o = c++;
+printf("The int type's maximum value is %d\n", o);
+printf("And the overflowed number got wrapped as %d\n", c);
+
+printf("\nActually this wrapped number is the minimum number of type int. We can show this by\n...");
+
+o = 1;
+c = 0;
+while (o > c)
+    o = c--;
+printf("\nThe int type's minimum value is %d\n", o);
+printf("And the underflowed number got wrapped as %d\n", c);
+#+END_SRC
+
+#+RESULTS:
+: The int type's maximum value is 2147483647
+: And the overflowed number got wrapped as -2147483648
+:
+: Actually this wrapped number is the minimum number of type int. We can show this by
+: ...
+: The int type's minimum value is -2147483648
+: And the underflowed number got wrapped as 2147483647
