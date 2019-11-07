@@ -3224,3 +3224,47 @@ printf("And the underflowed number got wrapped as %d\n", c);
 : ...
 : The int type's minimum value is -2147483648
 : And the underflowed number got wrapped as 2147483647
+
+We can apply exactly same idea into all of non-floating-point types.
+
+For the floating-point types, we should use multiplication rather than addition
+since floating-point numbers has exponent part in it; and this exponent part
+mainly determines the range of that type:
+
+#+BEGIN_SRC C :results verbatim :exports both
+float c;
+float o;
+o = 1.0;
+c = 10.0;
+while (o < c) {
+    o = c;
+    c = 10.0 * c;
+}
+
+printf("The float type's maximum value is %le\n", o);
+printf("And the overflowed number got wrapped as %le\n", c);
+
+printf("\nActually this wrapped number is the minimum number of type float. We can show this by\n...");
+
+o = 10.0;
+c = 1.0;
+while (o > c) {
+    o = c;
+    c = c / 10.0;
+}
+printf("\nThe float type's minimum value is %le\n", o);
+printf("And the underflowed number got wrapped as %le\n", c);
+#+END_SRC
+
+#+RESULTS:
+: The float type's maximum value is inf
+: And the overflowed number got wrapped as inf
+:
+: Actually this wrapped number is the minimum number of type float. We can show this by
+: ...
+: The float type's minimum value is 0.000000e+00
+: And the underflowed number got wrapped as 0.000000e+00
+
+Oops.. Turns out it doesn't works as expected; I could not come up with the good
+way to detect the overflow of floating-point type as it has =inf= notation for
+that.
