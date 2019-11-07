@@ -3526,8 +3526,10 @@ above assertion fails. So we need to use =unsigned= rather than =int= in
 
 #+BEGIN_SRC C :main no :includes <stdio.h> :exports both
 int rightrot(unsigned int x, int n) {
-    unsigned int wrapped = ~(~0 << n) & x;
-    return (x >> n) | (wrapped << (8 * sizeof(int) - n));
+    int intBits = 8 * sizeof(int);
+    int rotatingN = n % intBits;
+    unsigned int wrapped = ~(~0 << rotatingN) & x;
+    return (x >> rotatingN) | (wrapped << (intBits - rotatingN));
 }
 
 int main(void) {
