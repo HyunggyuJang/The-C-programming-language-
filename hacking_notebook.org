@@ -3338,14 +3338,16 @@ int htoi(char s[])
 }
 
 int main(void) {
-    char hex[] = "0xffff";      /* should be 65535 */
-    printf("The hexadecial string %s got converted as %d", hex, htoi(hex));
+    char hex[] = "0xffaff";
+    printf("The hexadecial string %s got converted as %d\n", hex, htoi(hex));
+    printf("It should be %d", 0xffaff);
     return 0;
 }
 #+END_SRC
 
 #+RESULTS:
-: The hexadecial string 0xffff got converted as 65535
+: The hexadecial string 0xffaff got converted as 1047295
+: It should be 1047295
 *** Increment and Decrement Operators
 **** Exercise 2-4
 :PROPERTIES:
@@ -3447,3 +3449,33 @@ int main(void) {
 
 #+RESULTS:
 : character t in string is found at 1, which is in character
+*** Bitwise Operators
+:PROPERTIES:
+:NOTER_PAGE: 46
+:END:
+**** Exercise 2-6
+:PROPERTIES:
+:NOTER_PAGE: 47
+:END:
+
+We can achieve what we want by taking the bits in specificed range from =y= and
+for else from =x= and set that to =x=; for the task of tearing off the
+specificed range's bits, we can apply the idea of =getbits=:
+
+#+BEGIN_SRC C :main no :includes <stdio.h>
+/* setbits: set n bits of x from position p to those of y */
+unsigned setbits(unsigned x, int p, int n, unsigned y) {
+    unsigned mask = ~(~0 << n) << (p + 1 - n);
+    return x = x & ~mask | y & mask;
+}
+
+int main(void) {
+    unsigned int x = 0xff;
+    unsigned int y = 0;
+    printf("x got setbits with y results in %x", setbits(x, 3, 4, y));
+    return 0;
+}
+#+END_SRC
+
+#+RESULTS:
+: x got setbits with y results in f0
