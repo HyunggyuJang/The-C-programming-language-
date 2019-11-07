@@ -3466,7 +3466,7 @@ specificed range's bits, we can apply the idea of =getbits=:
 /* setbits: set n bits of x from position p to those of y */
 unsigned setbits(unsigned x, int p, int n, unsigned y) {
     unsigned mask = ~(~0 << n) << (p + 1 - n);
-    return x = x & ~mask | y & mask;
+    return x = x & ~mask | (y << (p + 1 - n)) & mask;
 }
 
 int main(void) {
@@ -3498,3 +3498,45 @@ int main(void) {
 
 #+RESULTS:
 : x got inverted results in f0
+**** Exercise 2-8
+We can define =rightrot= function to be machine-independent by checking the bits
+of =int= type before operates on; the checking process could require linear time
+with respect to the bit number of =int= or constant if we use =sizeof=
+operater. This is analogous situation we encountered in [[*Exercise 2-1][Exercise 2-1]]:
+#+BEGIN_SRC C :main no :includes <stdio.h> :exports both
+int rightrot(int x, int n) {
+    int wrapped = ~(~0 << n) & x;
+    return (x >> n) | (wrapped << (8 * sizeof(int) - n));
+}
+
+int main(void) {
+    int x = 1;
+    printf("The integer %d should be same as %d",
+           x, rightrot(rightrot(x, x), (8 * sizeof(int) - x)));
+    return 0;
+}
+#+END_SRC
+
+#+RESULTS:
+: The integer 1 should be same as -1
+
+Unfortunately, the shift function works differently in =int= from =unsigned= as
+above assertion fails. So we need to use =unsigned= rather than =int= in
+=rightrot='s automatic variables.
+
+#+BEGIN_SRC C :main no :includes <stdio.h> :exports both
+int rightrot(unsigned int x, int n) {
+    unsigned int wrapped = ~(~0 << n) & x;
+    return (x >> n) | (wrapped << (8 * sizeof(int) - n));
+}
+
+int main(void) {
+    int x = 1;
+    printf("The integer %d should be same as %d",
+           x, rightrot(rightrot(x, x), (8 * sizeof(int) - x)));
+    return 0;
+}
+#+END_SRC
+
+#+RESULTS:
+: The integer 1 should be same as 1
