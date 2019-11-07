@@ -3479,3 +3479,22 @@ int main(void) {
 
 #+RESULTS:
 : x got setbits with y results in f0
+**** Exercise 2-7
+It is more simpler than preceding one:
+
+#+BEGIN_SRC C :main no :includes <stdio.h>
+/* invert: returns x with the n bits inverted that begin at position p */
+unsigned invert(unsigned x, int p, int n) {
+    unsigned mask = ~(~0 << n) << (p + 1 - n);
+    return x = x ^ mask;
+}
+
+int main(void) {
+    unsigned int x = 0xff;
+    printf("x got inverted results in %x", invert(x, 3, 4));
+    return 0;
+}
+#+END_SRC
+
+#+RESULTS:
+: x got inverted results in f0
