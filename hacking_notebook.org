@@ -3346,3 +3346,104 @@ int main(void) {
 
 #+RESULTS:
 : The hexadecial string 0xffff got converted as 65535
+*** Increment and Decrement Operators
+**** Exercise 2-4
+:PROPERTIES:
+:NOTER_PAGE: 46
+:END:
+
+This is quite straightforward function; so let me just code it:
+#+BEGIN_SRC C :main no :exports both :results verbatim
+/* isMember: check whether c is in s */
+int isMember(char c, char s[]) {
+    int i;
+    for (i = 0; s[i] != '\0'; ++i)
+        if (c == s[i])
+            return 1;
+    return 0;
+}
+/* test isMember */
+int main(void) {
+    char c = 's';
+    char c2 = 'c';
+    char s[] = "string";
+    printf("character %c is in %s?\n%d\n", c, s, isMember(c, s));
+    printf("character %c is in %s?\n%d\n", c2, s, isMember(c2, s));
+    return 0;
+}
+#+END_SRC
+
+#+RESULTS:
+: character s is in string?
+: 1
+: character c is in string?
+: 0
+
+#+BEGIN_SRC C :main no :exports both :results verbatim
+/* isMember: check whether c is in s */
+int isMember(char c, char s[]) {
+    int i;
+    for (i = 0; s[i] != '\0'; ++i)
+        if (c == s[i])
+            return 1;
+    return 0;
+}
+/* squeeze: delete all characters from s1 which matches in s2 */
+void squeeze(char s1[], char s2[]) {
+    int i, j;
+
+    for (i = j = 0; s1[i] != '\0'; ++i)
+        if ((!isMember(s1[i], s2)))
+            s1[j++] = s1[i];
+    s1[j] = '\0';
+}
+/* test squeeze */
+int main(void) {
+    char s1[] = "string";
+    char s2[] = "character";
+    squeeze(s1, s2);
+    printf("string %s is squeezed using %s",s1, s2);
+    return 0;
+}
+#+END_SRC
+
+#+RESULTS:
+: string sing is squeezed using character
+**** Exercise 2-5
+As this behavior has many commonality with preceding exercise, we can exploit
+this fact:
+
+#+BEGIN_SRC C :main no :exports both :results verbatim
+
+/* isMember: check whether c is in s */
+int isMember(char c, char s[]) {
+    int i;
+    for (i = 0; s[i] != '\0'; ++i)
+        if (c == s[i])
+            return 1;
+    return 0;
+}
+/* any: find the first location in s1 where any character is in s2 */
+int any(char s1[], char s2[]) {
+    int i;
+
+    for (i = 0; s1[i] != '\0'; ++i)
+        if (isMember(s1[i], s2))
+            return i;
+    return -1;
+}
+/* test any */
+int main(void) {
+    char s1[] = "string";
+    char s2[] = "character";
+    int ind = any(s1, s2);
+    if (ind >= 0){
+        printf("character %c in %s is found at %d, which is in %s",
+               s1[ind], s1, ind, s2);
+    }
+    return 0;
+}
+#+END_SRC
+
+#+RESULTS:
+: character t in string is found at 1, which is in character
