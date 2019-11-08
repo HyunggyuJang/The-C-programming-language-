@@ -3766,15 +3766,6 @@ int isSameTypeAndPrecede(char c1, char c2) {
                        : islower(c1) ? islower(c2)
                        : isupper(c1) ? isupper(c2)
                        : 0);
-    /* if (c1 < c2) */
-    /*     if (isdigit(c1)) */
-    /*         return isdigit(c2); */
-    /*     else if (islower(c1)) */
-    /*         return islower(c2); */
-    /*     else if (isupper(c1)) */
-    /*         return isupper(c2); */
-    /*     else return 0; */
-    /* else return 0; */
 }
 
 void expand(char s1[], char s2[]) {
@@ -4057,3 +4048,46 @@ int strrindex(char s[], char t[]) {
 : the string ould is found at index 22
 
 Works as expected.
+*** Functions Returning Non-integers
+**** Exercise 4-2
+It is straightforward to implement with the help of =pow=:
+#+BEGIN_SRC C :main no :exports both
+#include <ctype.h>
+#include <math.h>
+
+double atof(char s[]) {
+    double val, power;
+    int i, sign, expSign, exp;
+
+    for (i = 0; isspace(s[i]); i++)
+        ;
+    sign = (s[i] == '-') ? -1 : 1;
+    if (s[i] == '+' || s[i] == '-')
+        i++;
+    for (val = 0.0; isdigit(s[i]); i++)
+        val = 10.0 * val + (s[i] - '0');
+    if (s[i] == '.')
+        i++;
+    for (power = 1.0; isdigit(s[i]); i++) {
+        val = 10.0 * val + (s[i] - '0');
+        power *= 10.0;
+    }
+    if (s[i] == 'e')
+        i++;
+    expSign = (s[i] == '-') ? -1 : 1;
+    if (s[i] == '+' || s[i] == '-')
+        i++;
+    for (exp = 0; isdigit(s[i]); i++)
+        exp = 10 * exp + (s[i] - '0');
+    return sign * val / power * pow(10, expSign * exp);
+}
+
+int main(void) {
+    char s[] = "123.45e-6";
+    printf("string %s got transformed with atof as %.8f", s, atof(s));
+}
+#+END_SRC
+
+#+RESULTS:
+: string 123.45e-6 got transformed with atof as 0.00012345
+*** External Variables
