@@ -3587,3 +3587,117 @@ int lower(int c) {
     return (c >= 'A' && c <= 'Z' ? c + 'a' - 'A' : c);
 }
 #+END_SRC
+
+** Chapter 3 - Control Flow
+:PROPERTIES:
+:NOTER_PAGE: 52
+:END:
+
+*** Else-If
+:PROPERTIES:
+:NOTER_PAGE: 54
+:END:
+
+**** Exercise 3-1
+:PROPERTIES:
+:NOTER_PAGE: 54
+:END:
+
+Since now we have only one test in the loop, we can not detect the immediate
+answer; we can only halve the search space in each loop.
+
+To implement this new strategy, we need to use the following observation: The
+search space should pass through only one before falls back to the failure.
+Using this observation we can detect what is the case where given =x= is found
+in given search space or not -- if after the loop, the =low= and =high= equals
+each other, it means the given item is found in the search space, otherwise not:
+#+BEGIN_SRC C :main no
+int binsearch(int x, int v[], int n) {
+    int low, high, mid;
+
+    low = 0;
+    high = n - 1;
+    while (low + 1 < high) {
+        mid = (low + high) / 2;
+        if (x < v[mid])
+            high = mid - 1;
+        else
+            low = mid;
+    }
+    if (v[mid] == x)
+        return mid;
+    else
+        return -1;
+}
+/* test new binsearch process */
+int main(void) {
+    int test[10];
+    int i = 0;
+    while (i < 10)              /* initialize */
+        test[i] = i++;
+    i = 3;                      /* test integer */
+    printf("the test integer %d found in index %d at test search space",
+           i, binsearch(i, test, 10));
+    return 0;
+}
+#+END_SRC
+
+Unfortunately this version won't work in two reason:
+- The initialization does not work as expected. It just fails.
+- The =binsearch= we implemented in above, missed the case where =low= \le
+  =high= and ~v[mid] >= x~, where the search space does not converge to just one.
+
+
+Let alone the analysis why those things happened; let's fix those with
+alternative way:
+
+#+BEGIN_SRC C :main no
+int binsearch(int x, int v[], int n) {
+    int low, high, mid;
+
+    low = 0;
+    high = n - 1;
+    while (low < high) {
+        mid = (low + high) / 2; /* Reduce the high */
+        if (x > v[mid])
+            low = mid + 1;
+        else
+            high = mid;
+    }
+    if (x == v[low])            /* search space became just one */
+        return low;
+    else
+        return -1;
+}
+/* test new binsearch process */
+int main(void) {
+    int test[10];
+    int i;
+    for (i = 0; i < 10; ++i)
+        test[i] = i;
+    i = 1;                      /* test integer */
+    printf("the test integer %d found in index %d at test search space",
+           i, binsearch(i, test, 10));
+    return 0;
+}
+#+END_SRC
+
+#+RESULTS:
+: the test integer 1 found in index 1 at test search space
+
+Now it works as expected. Then let's think about why those malfunction has
+happend in previous version:
+- For the initialization problem, we have assumed the of assignment would
+  proceed left to right, which depends on implementation detail; so it is
+  possible that we have tried to mutate the overflowed indexed element; we
+  shouldn't program like that. So we have turned to another way, =for= loop,
+  that does not depend on the implementation detail.
+- For the search space problem, we should notice that integer division can be
+  used to reduce the upper limit of search space implicitly; but not in the
+  other way around -- reduce the search space by increasing the lower limit of
+  that when the search space come to have just 2 elements in it.
+
+
+For the other issues that observed at the entry point of this exercise, those
+still hold, that is, in that the search space should always be reduced down to
+just having one element in that range; no immediate exits with result.
