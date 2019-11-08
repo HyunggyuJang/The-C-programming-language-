@@ -3701,6 +3701,7 @@ happend in previous version:
 For the other issues that observed at the entry point of this exercise, those
 still hold, that is, in that the search space should always be reduced down to
 just having one element in that range; no immediate exits with result.
+
 *** Switch
 **** Exercise 3-2
 For simplicity, here we are going to cope with escape sequences of newline and
@@ -3864,7 +3865,7 @@ case? For simplicity let us satisfy with current result.
 **** Exercise 3-4
 Since the inverted largest negative number is itself in two's complement number
 system:
-#+BEGIN_SRC C :includes <stdio.h> <limits.h>
+#+BEGIN_SRC C :includes <stdio.h> <limits.h> :exports both :results verbatim
 int largestNeg = INT_MIN;
 int inverted = - largestNeg;
 printf("The largest negative number %d got inverted to %d", largestNeg, inverted);
@@ -3877,7 +3878,7 @@ Since this is the specific phenomenon for two's complement number system, we can
 also this fact to fix this: The largest negative number never ends with 9.
 
 Then the code got
-#+BEGIN_SRC C :main no :includes <stdio.h> <string.h> <limits.h>
+#+BEGIN_SRC C :main no :includes <stdio.h> <string.h> <limits.h> :exports both :results verbatim
 void reverse(char s[]) {
     int c, i, j;
     for (i =0, j = strlen(s) - 1; i < j; i++, j--)
@@ -3914,3 +3915,145 @@ int main(void) {
 
 #+RESULTS:
 : -2147483648 got stringified to -2147483648
+**** Exercise 3-5
+Here is also ambiguity in the specification: We should accept only 8, 16, 10,
+those handled by C language as number or should we accept whatever base number
+that we can afford to support? Reasonable limit of that would be 36 -- number of
+alphabet + digit.
+
+Here we are going to take the latter approach.
+
+#+BEGIN_SRC C :main no :includes <stdio.h> <string.h> <limits.h> :defines THREADHOLD 10
+void reverse(char s[]) {
+    int c, i, j;
+    for (i =0, j = strlen(s) - 1; i < j; i++, j--)
+        c = s[i], s[i] = s[j], s[j] = c;
+}
+
+void itob(int n, char s[], int b) {
+    int i, sign, remains;
+
+    if ((sign = n) < 0)
+        n = -n;
+    i = 0;
+    do {
+        remains = n % b;
+        s[i++] = (remains >= 10) ? remains - 10 + 'a' : remains + '0';
+    } while ((n /= b) > 0);
+    if (sign < 0)
+        s[i++] = '-';
+    s[i] = '\0';
+    reverse(s);
+}
+
+int main(void) {
+    char test[30];
+    int hex = - 0xaff;
+    itob(hex, test, 16);
+    printf("%x got stringified to %s", hex, test);
+    return 0;
+}
+#+END_SRC
+
+#+RESULTS:
+: fffff501 got stringified to -aff
+
+Works as expected; we have not coped with the largest negative number. If we
+wanted to do, we could implement that way but this implementation not going to
+be efficient as before -- it would cause overhead in loop; as it is not required
+in this exercise, let us satisfy with above version.
+**** Exercise 3-6
+
+It just need slight modification to the end:
+#+BEGIN_SRC C :main no :includes <stdio.h> <string.h> <limits.h> :exports both :results verbatim
+void reverse(char s[]) {
+    int c, i, j;
+    for (i =0, j = strlen(s) - 1; i < j; i++, j--)
+        c = s[i], s[i] = s[j], s[j] = c;
+}
+
+void itoa(int n, char s[], int min) {
+    int i, sign;
+    int overflow = 0;
+
+    if ((sign = n) < 0)
+        if ((n = -n) < 0) {
+            n = - (sign + 1);
+            overflow = 1;
+        }
+    i = 0;
+    s[i++] = n % 10 + '0' + (overflow ? 1 : 0);
+    while ((n /= 10) > 0)
+        s[i++] = n % 10 + '0';
+    if (sign < 0)
+        s[i++] = '-';
+    while (i < min)
+        s[i++] = ' ';
+    s[i] = '\0';
+    reverse(s);
+}
+
+int main(void) {
+    char test[30];
+    int neg = INT_MIN;
+    int minimumWidth = 30;
+    itoa(neg, test, minimumWidth);
+    printf("%d got stringified with minimum width %d to\n%s", neg, minimumWidth, test);
+    return 0;
+}
+#+END_SRC
+
+#+RESULTS:
+: -2147483648 got stringified with minimum width 30 to
+:                    -2147483648
+*** Break and Continue
+*** Goto and Labels
+** Chapter 4 -- Functions and Program Structure
+:PROPERTIES:
+:NOTER_PAGE: 62
+:END:
+*** Basics of Functions
+**** Exercise 4-1
+There are two possibilities how we implement the code:
+- Use reverse and use the =strindex= to find -- this method should resolve the
+  "beginning" index problem from using the underlying =stdindex= process.
+- Alter =strindex= to start to search from right most possible index.
+
+
+Here we are going to take the second approach since it is more straightforward
+and efficient.
+
+#+BEGIN_SRC C :main no :exports both :results verbatim
+#include <stdio.h>
+#include <string.h>
+#define MAXLINE 1000
+int strrindex(char source[], char searchfor[]);
+
+char pattern[] = "ould";
+
+main() {
+    char line[MAXLINE] = "Could would re-mould would";
+    printf("From string\n%s\nthe string %s is found at index %d",
+           line, pattern, strrindex(line, pattern));
+    return 0;
+}
+
+int strrindex(char s[], char t[]) {
+    int i, j, k;
+
+    for (i = strlen(s) - strlen(t); s[i] != '\0'; i--) {
+        for (j=i, k=0; t[k] != '\0' && s[j] == t[k]; j++, k++)
+            ;
+        if (k > 0 && t[k] == '\0')
+            return i;
+    }
+    return -1;
+}
+#+END_SRC
+
+#+RESULTS:
+: From string
+: Could would re-mould would
+: the string ould is found at index 22
+
+Works as expected.
