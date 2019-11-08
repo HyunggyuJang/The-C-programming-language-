@@ -3744,3 +3744,119 @@ int main(void) {
 : test
 : case
 : 	like	this got escaped to test\ncase\n\tlike\tthis
+*** Loops -- While and For
+**** Exercise 3-3
+We, as usual, will implement the task using state transition diagram. I think it
+is usual process dealing with C programming.
+
+First, we should make the specification concrete: We only going to treat given
+expression as shorthand notation if the forehand character precedes the latter
+in comparison operation and both are in same type -- alphabet or decimal digit.
+
+Then let's code it (the state diagram is drawn in my digital paper)!
+#+BEGIN_SRC C :main no :exports both :results verbatim
+#include <stdio.h>
+#include <ctype.h>
+
+#define START -1
+
+int isSameTypeAndPrecede(char c1, char c2) {
+    return c1 < c2 && (isdigit(c1) ? isdigit(c2)
+                       : islower(c1) ? islower(c2)
+                       : isupper(c1) ? isupper(c2)
+                       : 0);
+    /* if (c1 < c2) */
+    /*     if (isdigit(c1)) */
+    /*         return isdigit(c2); */
+    /*     else if (islower(c1)) */
+    /*         return islower(c2); */
+    /*     else if (isupper(c1)) */
+    /*         return isupper(c2); */
+    /*     else return 0; */
+    /* else return 0; */
+}
+
+void expand(char s1[], char s2[]) {
+    int state = START;
+    int i, j, k;
+    for (i = j = 0; s1[i] != '\0'; ++i) {
+        if (state == START) {
+            if (isalnum(s1[i]))
+                state = s1[i];
+            else if (s1[i] == '-') {
+                s2[j++] = s1[i];
+                state = '-';
+            }
+            else {
+                printf("error: Unexpected state %d", state);
+                return;
+            }
+        }
+        else if (state == '-') {
+            s2[j++] = s1[i];
+            state = START;
+        }
+        else if (isalnum(state)) {
+            if (s1[i] == '-') {
+                if (isSameTypeAndPrecede(state, s1[i + 1]) && s1[i + 2] != '-') { /* look ahead */
+                    ++i;
+                    for (k = state; k <= s1[i]; k++) /* expand */
+                        s2[j++] = k;
+                    state = START;
+                }
+                else {
+                    s2[j++] = state;
+                    s2[j++] = '-';
+                    state = '-';
+                }
+            }
+            else {
+                s2[j++] = state;
+                s2[j++] = s1[i];
+                state = START;
+            }
+        }
+        else {
+            printf("error: Unexpected state %d", state);
+            return;
+        }
+    }
+    s2[j] = '\0';               /* end of string */
+}
+
+int main(void) {
+    char test[] = "a-b-c";
+    char test2[] = "-a-z";
+    char test3[] = "a-z0-9";
+    char test4[] = "-a-z0-9";
+    char expanded[150];
+    expand(test, expanded);
+    printf("%s\ngot expanded to\n%s\n", test, expanded);
+    expand(test2, expanded);
+    printf("%s\ngot expanded to\n%s\n", test2, expanded);
+    expand(test3, expanded);
+    printf("%s\ngot expanded to\n%s\n", test3, expanded);
+    expand(test4, expanded);
+    printf("%s\ngot expanded to\n%s\n", test4, expanded);
+    return 0;
+}
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+a-b-c
+got expanded to
+a-b-c
+-a-z
+got expanded to
+-a-z
+a-z0-9
+got expanded to
+abcdefghijklmnopqrstuvwxyz0123456789
+-a-z0-9
+got expanded to
+-a-z0123456789
+#+end_example
+
+The ambiguity remains in this implementation: What should we return in the last
+case? For simplicity let us satisfy with current result.
