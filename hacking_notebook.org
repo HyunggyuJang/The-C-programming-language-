@@ -3651,7 +3651,7 @@ Unfortunately this version won't work in two reason:
 Let alone the analysis why those things happened; let's fix those with
 alternative way:
 
-#+BEGIN_SRC C :main no
+#+BEGIN_SRC C :main no :exports both :results verbatim
 int binsearch(int x, int v[], int n) {
     int low, high, mid;
 
@@ -3701,3 +3701,46 @@ happend in previous version:
 For the other issues that observed at the entry point of this exercise, those
 still hold, that is, in that the search space should always be reduced down to
 just having one element in that range; no immediate exits with result.
+*** Switch
+**** Exercise 3-2
+For simplicity, here we are going to cope with escape sequences of newline and
+horizontal tab. In the abstract level, it would be easier to design the
+algorithm using state transition diagram; for the implementation detail, we will
+use two indices to keep track of the current looks of two character array, =s=
+and =t=.
+
+#+BEGIN_SRC C :main no :includes <stdio.h> :exports both :results verbatim
+void escape(char s[],char t[]) {
+    int i,j;
+    for (i = j = 0; t[j] != '\0'; ++j) {
+        switch (t[j]) {
+            case '\n':
+                s[i++] = '\\';
+                s[i++] = 'n';
+                break;
+            case '\t':
+                s[i++] = '\\';
+                s[i++] = 't';
+                break;
+            default:
+                s[i++] = t[j];
+                break;
+
+        }
+    }
+    s[i] = '\0';
+}
+
+int main(void) {
+    char test[] = "test\ncase\n\tlike\tthis";
+    char to[30];
+    escape(to, test);
+    printf("%s got escaped to %s", test, to);
+    return 0;
+}
+#+END_SRC
+
+#+RESULTS:
+: test
+: case
+: 	like	this got escaped to test\ncase\n\tlike\tthis
