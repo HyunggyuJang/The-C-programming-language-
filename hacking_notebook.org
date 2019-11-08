@@ -3860,3 +3860,57 @@ got expanded to
 
 The ambiguity remains in this implementation: What should we return in the last
 case? For simplicity let us satisfy with current result.
+*** Loops -- Do-while
+**** Exercise 3-4
+Since the inverted largest negative number is itself in two's complement number
+system:
+#+BEGIN_SRC C :includes <stdio.h> <limits.h>
+int largestNeg = INT_MIN;
+int inverted = - largestNeg;
+printf("The largest negative number %d got inverted to %d", largestNeg, inverted);
+#+END_SRC
+
+#+RESULTS:
+: The largest negative number -2147483648 got inverted to -2147483648
+
+Since this is the specific phenomenon for two's complement number system, we can
+also this fact to fix this: The largest negative number never ends with 9.
+
+Then the code got
+#+BEGIN_SRC C :main no :includes <stdio.h> <string.h> <limits.h>
+void reverse(char s[]) {
+    int c, i, j;
+    for (i =0, j = strlen(s) - 1; i < j; i++, j--)
+        c = s[i], s[i] = s[j], s[j] = c;
+}
+
+void itoa(int n, char s[]) {
+    int i, sign;
+    int overflow = 0;
+
+    if ((sign = n) < 0)
+        if ((n = -n) < 0) {
+            n = - (sign + 1);
+            overflow = 1;
+        }
+    i = 0;
+    s[i++] = n % 10 + '0' + (overflow ? 1 : 0);
+    while ((n /= 10) > 0)
+        s[i++] = n % 10 + '0';
+    if (sign < 0)
+        s[i++] = '-';
+    s[i] = '\0';
+    reverse(s);
+}
+
+int main(void) {
+    char test[30];
+    int neg = INT_MIN;
+    itoa(neg, test);
+    printf("%d got stringified to %s", neg, test);
+    return 0;
+}
+#+END_SRC
+
+#+RESULTS:
+: -2147483648 got stringified to -2147483648
