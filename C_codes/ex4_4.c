@@ -7,6 +7,10 @@
 int getop(char []);
 void push(double);
 double pop(void);
+void showTop(void);
+void duplicate(void);
+void swapTops(void);
+void initStack(void);
 int isInt(double);
 
 /* reverse Polish calculator */
@@ -45,6 +49,18 @@ main() {
                 else
                     printf("error: arguments to moduls are not proper\n");
                 break;
+            case 't':
+                showTop();
+                break;
+            case 'd':
+                duplicate();
+                break;
+            case 's':
+                swapTops();
+                break;
+            case 'i':
+                initStack();
+                break;
             case '\n':
                 printf("\t%.8g\n", pop());
                 break;
@@ -76,6 +92,39 @@ double pop(void) {
         printf("error: stack empty\n");
         return 0.0;
     }
+}
+
+void showTop(void) {
+    if (sp > 0)
+        printf("The top element of stack is %.8g\n", val[sp - 1]);
+    else {
+        printf("error: stack empty\n");
+    }
+}
+
+void duplicate(void) {
+    if (sp > 0) {
+        double temp = pop();
+        push(temp);
+        push(temp);
+    }
+    else
+        printf("error: stack empty\n");
+}
+
+void swapTops(void) {
+    if (sp > 1) {
+        double temp = pop();
+        double temp2 = pop();
+        push(temp);
+        push(temp2);
+    }
+    else
+        printf("error: stack has less element than 2\n");
+}
+
+void initStack(void) {
+    sp = 0;
 }
 
 #include <ctype.h>
