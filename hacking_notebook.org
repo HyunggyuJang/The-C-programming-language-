@@ -5843,6 +5843,282 @@ printf " -100" | ./C_codes/current
 : The input stream is integer -100
 
 I don't know why the third test case won't work.
+**** Exercise 5-2
+Since the return value is the signal how the process terminated, =getfloat=
+would have same return value type as =getint=.
+#+BEGIN_SRC C :main no :tangle C_codes/ex5_2.c
+#include <ctype.h>
+#include <stdio.h>
+
+int getch(void);
+void ungetch(int);
+
+/* getint: get next integer from input into *pn */
+int getfloat(double *pf) {
+    int c, sign = 1;
+    double power;
+
+    while (isspace(c = getch())) /* skip white space */
+        ;
+    if (!isdigit(c) && c != EOF) { /* ensure c is digit */
+        if (c != '+' && c != '-') { /* ensure c is sign token */
+            ungetch(c);
+            return 0;
+        }
+        char signExp = c;
+        c = getch();            /* lookahead */
+        if (!isdigit(c)) {
+            if (c != EOF)
+                ungetch(c);         /* pushback */
+            ungetch(signExp);       /* sign is not number */
+            return 0;
+        }
+        sign = (signExp == '-') ? -1 : 1;
+    }
+    for (*pf = 0; isdigit(c); c = getch())
+        ,*pf = *pf * 10 + (c - '0');
+    if (c == '.')               /* floating point */
+        c = getch();
+    for (power = 1.0; isdigit(c); c = getch(), power *= 10.0)
+        ,*pf = *pf * 10 + (c - '0');
+    ,*pf *= sign;
+    ,*pf /= power;
+    if (c != EOF)
+        ungetch(c);
+    return c;
+}
+
+int main(void) {
+    double x ;
+    getfloat(&x);
+    printf("The input stream is double %g\n", x);
+    return 0;
+}
+#+END_SRC
+
+#+BEGIN_SRC sh
+cd C_codes
+cc ex5_2.c getch.c -o current
+#+END_SRC
+
+#+RESULTS:
+
+#+BEGIN_SRC sh :exports both :results verbatim
+echo -020.235 | ./C_codes/current
+#+END_SRC
+
+#+RESULTS:
+: The input stream is double -20.235
+*** Character Pointers and Functions
+:PROPERTIES:
+:NOTER_PAGE: 96
+:END:
+**** Exercise 5-3
+#+BEGIN_SRC C :exports both
+/* strcat: append string t to the end of s */
+void strcat(char *s, char *t) {
+    while (*s++)                /* find end of s */
+        ;
+    --s;                        /* adjust overshot */
+    while (*s++ = *t++)         /* use strcpy strategy */
+        ;
+}
+
+int main(void) {
+    char s[] = "This is the one and";
+    char t[] = " two";
+    strcat(s, t);
+    printf("%s", s);
+    return 0;
+}
+#+END_SRC
+
+#+RESULTS:
+: This is the one and two
+**** Exercise 5-4
+#+BEGIN_SRC C :exports both :includes <stdio.h> <string.h> :results verbatim
+/* strend: returns 1 if t occurs at the end of the string s else 0 */
+char strend(char *s, char *t) {
+    int offset = strlen(s) - strlen(t);
+    return offset >= 0 && !strcmp(s+offset, t);
+}
+
+int main(void) {
+    char s[] = "TEst end";
+    char t[] = "end";
+    printf("%s\noccurs at the end of\n%s\n?\n%d", t, s, strend(s, t));
+    return 0;
+}
+#+END_SRC
+
+#+RESULTS:
+: end
+: occurs at the end of
+: TEst end
+: ?
+: 1
+**** Exercise 5-5
+#+BEGIN_SRC C
+void strncopy(char *s, char *t, int n) {
+    while (n-- > 0 && (*s++ = *t++))
+        ;
+}
+
+void strncat(char *s, char *t, int n) {
+    while (*s++)                /* find end of s */
+        ;
+    --s;                        /* adjust overshot */
+    while (n-- > 0 && (*s++ = *t++)) /* use strncpy strategy */
+        ;
+}
+
+int strncmp(char *s, char *t, int n) {
+    for ( ; n-- > 0 && *s == *t; s++, t++)
+        if (*s == '\0')
+            return 0;
+    return *s - *t;
+}
+#+END_SRC
+**** Exercise 5-6
+#+BEGIN_SRC C :tangle C_codes/ex5_6.c :includes <stdio.h> <ctype.h>
+int getLine(char *s, int lim) {
+    int c;
+    int tLim = lim;
+    while (lim > 1 && (c = getchar()) != EOF && c != '\n')
+        ,*s++ = c, lim--;
+    if (c == '\n')
+        ,*s++ = c, lim--;
+    ,*s = '\0';
+    return tLim - lim;
+}
+
+void reverse(char *s) {
+    char *t = s + strlen(s) - 1;
+    char temp;
+    while (s < t)
+        temp = *s, *s++ = *t, *t-- = temp;
+}
+
+int atoi(char *s) {
+    int n = 0;
+    if (isspace(*s))
+        while (isspace(*s++))
+            ;
+    --s;                        /* revert one overshot */
+    while (isdigit(*s))
+        n = 10 * n + (*s++ - '0');
+    return n;
+}
+
+void itoa(int n, char *s) {
+    int sign;
+    char *t = s;
+    if ((sign = n) < 0)
+        n = -n;
+    do {
+        ,*s++ = n % 10 + '0';
+    }
+    while ((n /= 10) > 0);
+    if (sign < 0)
+        ,*s++ = '-';
+    ,*s = '\0';
+    reverse(t);                 /* reverse the whole string */
+}
+
+int strindex(char *s, char *t) {
+    char *u, *v, *w;            /* moving pointers */
+    for (w = s; *w != '\0'; w++) {
+        for (u = w, v = t; *u != '\0' && *u++ == *v++;)
+            ;
+        if ((v - t) && *v == '\0')
+            return w - s;
+    }
+    return -1;
+}
+
+int main(void) {
+    char test[20];
+    getLine(test, 20);
+    printf("%s got from getLine\n", test);
+    reverse(test);
+    printf("and got revered as %s\n", test);
+    int testInt = atoi(test);
+    printf("Now it transformed as int %d\n", testInt);
+    itoa(testInt, test);
+    printf("It reverted back as %s\n", test);
+    char test2[20];
+    getLine(test2, 20);
+    printf("Then %s occurs at %d in %s", test2, strindex(test, test2), test);
+    return 0;
+}
+#+END_SRC
+
+#+BEGIN_SRC sh
+cd C_codes
+cc ex5_6.c -o current
+#+END_SRC
+
+#+RESULTS:
+
+#+BEGIN_SRC sh :exports both :results verbatim
+printf "012\n10" | C_codes/current
+#+END_SRC
+
+#+RESULTS:
+: 012
+:  got from getLine
+: and got revered as
+: 210
+: Now it transformed as int 210
+: It reverted back as 210
+: Then 10 occurs at 1 in 210
+
+And
+
+#+BEGIN_SRC C :tangle C_codes/getop_ptr.c :main no
+#include <stdio.h>
+#include <ctype.h>
+#include "calc.h"
+
+/* getop: get next operator or numeric operand */
+int getop(char s[]) {
+    int i, c;
+    char *t = s;
+
+    while ((*t = c = getch()) == ' ' || c == '\t')
+        ;
+    ,*++t = '\0';
+    if (!isdigit(c) && c != '.')
+        return c;               /* not a number */
+    t = s;
+    if (isdigit(c))             /* collect integer part */
+        while (isdigit(*++t = c = getch()))
+            ;
+    if (c == '.')               /* collect fractional part */
+        while (isdigit(*++t = c = getch()))
+            ;
+    ,*t = '\0';
+    if (c != EOF)               /* ungetch cannot cope with EOF, which is not in char range */
+        ungetch(c);
+    return NUMBER;
+}
+#+END_SRC
+
+#+BEGIN_SRC sh
+cd C_codes
+cc main.c getop_ptr.c stack.c getch.c -o expr
+#+END_SRC
+
+#+RESULTS:
+
+#+BEGIN_SRC sh :exports both :results verbatim
+echo "1 2 - 4 5 + *" | ./C_codes/expr
+echo "1.34 1.87 - 4 5 + *" | ./C_codes/expr
+#+END_SRC
+
+#+RESULTS:
+: 	-9
+: 	-4.77
 
 *** Pointers vs. Multi-dimensional Arrays
 #+BEGIN_SRC C :exports both :results verbatim
