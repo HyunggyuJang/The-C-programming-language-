@@ -6121,8 +6121,122 @@ echo "1.34 1.87 - 4 5 + *" | ./C_codes/expr
 #+RESULTS:
 : 	-9
 : 	-4.77
+*** Pointers Arrays; Pointers to Pointers
+:PROPERTIES:
+:NOTER_PAGE: 99
+:END:
+**** Exercise 5-7
+:PROPERTIES:
+:NOTER_PAGE: 99
+:END:
+
+Rephrasing what the statement said as /assume that the memory allocation is done
+in main routines/, then we can directly pass =getline= with the given character
+array:
+
+#+BEGIN_SRC C
+#define MAXLEN
+int getline(char *, int);
+
+int readlines(char *lineptr[], int maxlines) {
+    int len, nlines = maxlines;
+    while (maxlines-- > 0 && (len = getline(*lineptr, MAXLEN)) > 0)
+        ,*lineptr++[len - 1] = '\0'; /* delete newline */
+    if (len && getchar() != EOF)
+        return -1;
+    return nlines - maxlines;
+}
+#+END_SRC
+
+
+*** Multi-dimensional Arrays
+:PROPERTIES:
+:NOTER_PAGE: 99
+:END:
+
+#+BEGIN_SRC C
+static char daytab[2][13] = {
+{0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31},
+{0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
+};
+
+int day_of_year(int year, int month, int day) {
+    int i, leap;
+    leap = year % 4 == 0 && year % 100 != 0 || year & 400 == 0;
+    for (i = 1; i < month; i++)
+        day += daytab[leap][i];
+    return day;
+}
+
+void month_day(int year, int yearday, int *pmonth, int *pday) {
+    int i, leap;
+    leap = year % 4 == 0 && year % 100 != 0 || year & 400 == 0;
+    for (i = 1; yearday > daytab[leap][i]; i++)
+        yearday -= daytab[leap][i];
+    ,*pmonth = i;
+    *pday = yearday;
+}
+#+END_SRC
+**** Exercise 5-8
+:PROPERTIES:
+:NOTER_PAGE: 101
+:END:
+
+Firstly, we need to ensure month to be between 1 and 12 inclusively; and day
+should be less than or equals to the last day of that month. This suggests the
+error checking of =day_of_year=:
+
+#+BEGIN_SRC C
+int day_of_year(int year, int month, int day) {
+    int i, leap;
+    if (month > 12 || month < 1) {
+        printf("error: such month, %d, doesn't exist", month);
+        return 0;
+    }
+    leap = year % 4 == 0 && year % 100 != 0 || year & 400 == 0;
+    if (day > daytab[leap][month] || day < 1) {
+        printf("error: such day, %d, doesn't exist", day);
+        return 0;
+    }
+    for (i = 1; i < month; i++)
+        day += daytab[leap][i];
+    return day;
+}
+#+END_SRC
+
+For the =month_day=, we need to check given =yearday= is less than the summation
+of days in given year: This is a good place to use static internal declaration.
+
+#+BEGIN_SRC C
+void month_day(int year, int yearday, int *pmonth, int *pday) {
+    int i, leap;
+    static char wholeday[2] = {0, 0};
+    leap = year % 4 == 0 && year % 100 != 0 || year & 400 == 0;
+    if (wholeday[leap] == 0) {
+        char *pt = daytab[leap];
+        for (*pt++; pt - daytab[leap] <= 13; wholeday[leap] += *pt++)
+            ;
+    }
+    if (yearday > wholeday[leap] || yearday < 1) {
+        printf("error: given yearday, %d, does not exist in current year, %d",
+               yearday, year);
+        ,*pmonth = 0, *pday = 0;
+    }
+    for (i = 1; yearday > daytab[leap][i]; i++)
+        yearday -= daytab[leap][i];
+    ,*pmonth = i;
+    ,*pday = yearday;
+
+}
+#+END_SRC
 
 *** Pointers vs. Multi-dimensional Arrays
+:PROPERTIES:
+:NOTER_PAGE: 101
+:END:
+
+The difference between the pointer array between multi-dimensional array is
+followings:
 #+BEGIN_SRC C :exports both :results verbatim
 int a[3][3] = {{1, 2, 3}, {4, 5, 6}, {7, 8, 9}};
 int *b[3] = {{1, 2, 3}, {4, 5, 6}, {7, 8, 9}};
@@ -6138,3 +6252,49 @@ printf("the size of *b is %u\n", sizeof(*b));
 : the forth element of a is 4
 : the size of *a is 12
 : the size of *b is 8
+
+Using these experiments, you should convince yourself what text described.
+
+**** Exercise 5-9
+:PROPERTIES:
+:NOTER_PAGE: 102
+:END:
+
+#+BEGIN_SRC C :exports both :results verbatim
+static char daytab[2][13] = {
+{0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31},
+{0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
+};
+
+int day_of_year(int year, int month, int day) {
+    int leap;
+    char *pm;                   /* moving pointer for # day of each month */
+    leap = year % 4 == 0 && year % 100 != 0 || year & 400 == 0;
+    for (pm = daytab[leap]; 1 < month--; day += *++pm)
+        ;
+    return day;
+}
+
+void month_day(int year, int yearday, int *pmonth, int *pday) {
+    int leap;
+    char *pm;                   /* moving pointer for # day of each month */
+    leap = year % 4 == 0 && year % 100 != 0 || year & 400 == 0;
+    for (pm = daytab[leap]; yearday > *++pm;)
+        yearday -= *pm;
+    ,*pmonth = pm - daytab[leap];
+    ,*pday = yearday;
+}
+
+int main(void) {
+    int month = 3, day = 20, year = 1996;
+    int yearday =  day_of_year(year, month, day);
+    printf("the day of %d/%d/%d is %d\n", year, month, day, yearday);
+    month_day(year, yearday, &month, &day);
+    printf("and %d of %d is %d/%d/%d", yearday, year, year, month, day);
+    return 0;
+}
+#+END_SRC
+
+#+RESULTS:
+: the day of 1996/3/20 is 80
+: and 80 of 1996 is 1996/3/20
