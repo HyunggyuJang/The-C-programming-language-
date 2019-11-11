@@ -6298,3 +6298,79 @@ int main(void) {
 #+RESULTS:
 : the day of 1996/3/20 is 80
 : and 80 of 1996 is 1996/3/20
+
+*** Command-line Arguments
+:PROPERTIES:
+:NOTER_PAGE: 102
+:END:
+
+**** Exercise 5-10
+:PROPERTIES:
+:NOTER_PAGE: 105
+:END:
+
+#+BEGIN_SRC C :tangle C_codes/ex5_10.c :main no
+#include <stdio.h>
+#include <stdlib.h>             /* for atof() */
+#include "calc.h"
+
+#define MAXOP 100               /* max size of operand or operator */
+
+int gettype(char *s) {
+    if (!isdigit(*s) && *s != '.')
+        return *s;              /* not a number */
+    return NUMBER;
+}
+
+/* reverse Polish calculator */
+int main(int argc, char *argv[]) {
+    int type;
+    double op2;
+    char s[MAXOP];
+
+    while (--argc > 0) {
+        switch (gettype(*++argv)) {
+            case NUMBER:
+                push(atof(*argv));
+                break;
+            case '+':
+                push(pop() + pop());
+                break;
+            case '*':
+                push(pop() * pop());
+                break;
+            case '-':
+                op2 = pop();
+                push(pop() - op2);
+                break;
+            case '/':
+                op2 = pop();
+                if (op2 != 0.0)
+                    push(pop() - op2);
+                else
+                    printf("error: zero divisor\n");
+                break;
+            default:
+                printf("error: unknown command %s\n", *argv);
+                break;
+        }
+    }
+    printf("\t%.8g\n", pop());
+    return 0;
+}
+#+END_SRC
+
+Here is the simplest commandline calculator program.
+#+BEGIN_SRC sh
+cd C_codes
+cc ex5_10.c stack.c -o expr
+#+END_SRC
+
+#+RESULTS:
+
+#+BEGIN_SRC sh :exports both :results verbatim
+./C_codes/expr 2 3 4 + \*
+#+END_SRC
+
+#+RESULTS:
+: 	14
