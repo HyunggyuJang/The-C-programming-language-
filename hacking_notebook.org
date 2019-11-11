@@ -4898,6 +4898,8 @@ main() {
     double vars['Z' - 'A' + 1]; /* the storage of variables */
     char isdefined['Z' - 'A' + 1]; /* flag for defined variables */
     int setvar = -1;               /* state for setting variable */
+    double lastValue = 0.0;        /* last printed value */
+    char everPrinted = 0;
     char s[MAXOP];
 
     int i;
@@ -4974,7 +4976,15 @@ main() {
                 initStack();
                 break;
             case '\n':
-                printf("\t%.8g\n", pop());
+                lastValue = pop();
+                everPrinted = 1;
+                printf("\t%.8g\n", lastValue);
+                break;
+            case '"':
+                if (!everPrinted)
+                    printf("error: there is no value calculated ever");
+                else
+                    push(lastValue);
                 break;
             default:
                 printf("error: unknown command %s\n", s);
@@ -5114,10 +5124,331 @@ cc ex4_6.c -o expr
 
 Variable test:
 #+BEGIN_SRC sh :exports both :results verbatim
-printf "= B 2 B\nB 5 +\n= A B A B *\n" | ./C_codes/expr
+printf "= B 2 B\nB 5 +\n= A B A B *\n\" B +\n" | ./C_codes/expr
 #+END_SRC
 
 #+RESULTS:
 : 	2
 : 	7
 : 	4
+: 	6
+
+We could refactor above =main= routine -- if we chose to initialize all the
+variables 0.0 at the start up, then we don't need to keep track of the flag
+array; furthermore we could get rid of prefix notation of assignment to postfix
+notation-- but for now, let it be as it is.
+**** Exercise 4-7
+:PROPERTIES:
+:NOTER_PAGE: 72
+:END:
+
+We use =ungetch= to push back the =getch= ed character /as if/ to the input
+stream; =ungetch= should be done in reverse order of =getch=. Since the
+=getline= method depends on =getchar= for the manipulation of input stream, it
+suggests =ungets(s)= should also rely on =ungetch= for the buffer management.
+
+
+As we noted =ungets(s)= should push back the characters from the tail of line;
+this implies it need to know the length of given string to start from the last
+character, or we could use recursive function definition to do this job for us
+as we did in [[*Exercise 1-16][Exercise 1-16]]. However, we have not yet learned to slice the given
+array to be used in the subsequent function call, we are going to assume that it
+takes length of array also as its formal parameter.
+
+#+BEGIN_SRC C :main no
+void ungetch(int);
+
+void ungets(char s[], int len) {
+    while (len > 0)
+        ungetch(s[--len]);
+}
+#+END_SRC
+
+The resulting code is very simple; but it does not handle erroneous behavior --
+e.g. even if there is no space to fit the given length of string, it will try to
+=ungetch= until it reaches the first character of string. Furthermore, it do not
+know whether =ungetch= complaints that there is no more spaces or not.
+
+This is exactly same problem we would encounter when we try to allocate given
+data in the memory dynamically; so unlike the =getline=, =ungets= need to know
+the free space in buffer, which in turn means it should access =bufp= and
+=BUFSIZE= to calculate the free space.
+
+So our final code should be
+#+BEGIN_SRC C :main no
+#define BUFSIZE 100
+
+char buf[BUFSIZE];              /* buffer for ungetch */
+int bufp = 0;                   /* next free position in buf */
+
+int getch(void) {               /* get a (possibly pushed back) character */
+    return (bufp > 0) ? buf[--bufp] : getchar();
+}
+
+void ungetch(int c) {           /* push character back on input */
+    if (bufp >= BUFSIZE)
+        printf("ungetch: too many characters\n");
+    else
+        buf[bufp++] = c;
+}
+
+void ungets(char s[], int len) {
+    if (len + bufp < BUFSIZE)   /* if there is enough space in buffer */
+        while (len > 0)
+            ungetch(s[--len]);
+    else
+        printf("ungets: too many characters\n");
+}
+#+END_SRC
+**** Exercise 4-8
+:PROPERTIES:
+:NOTER_PAGE: 72
+:END:
+Since we know that only one character possibly get pushbacked, we can replace
+the character buffer into one character variable. And we also should replace the
+=bufp='s role of detecting whether there is any pushbacked character in =getch=
+into flag or initializing the pushbacked character to =NULL= character, which
+would not appear in input character stream to signal there is no pushbacked.
+
+#+BEGIN_SRC C :main no
+#define BUFSIZE 100
+
+char pushbacked = '\0';
+char hasPushbacked = 0;        /* signal that the pushback is non */
+
+int getch(void) {               /* get a (possibly pushed back) character */
+    if (hasPushbacked) {
+        hasPushbacked = 0;
+        return pushbacked;
+    }
+    else
+        return getchar();
+}
+
+void ungetch(int c) {           /* push character back on input */
+    if (hasPushbacked)
+        printf("ungetch: too many characters\n"); /* more than one character has ungetched */
+    else
+        pushbacked = c, hasPushbacked = 1;
+}
+#+END_SRC
+**** Exercise 4-9
+To solve this, first, we need to analyze that what malfunction it would cause in
+the current =getch= and =ungetch=. In our current functions, we should just
+ignore the =EOF= signal, e.g. in =getop=, since this data would not fit into the
+=char= type; that is the exactly the purpose of =EOF=.
+
+One possible solution would change the buffer's type into =int= to cope with
+=EOF=; but this approach would causes way too overhead for the memory usage
+since the only character that it can not handle is =EOF=.
+
+Rather than, we should think of the role of =EOF= and should mimic that in
+current =getch= and =ungetch=.
+
+The most reasonable one, I think, is to use flag to signal =ungetch= encountered
+=EOF= and if it is, it should destroy all the buffer elements since it should
+not be reached in any legitimate way; =getch= should return =EOF= after it
+accepts the =EOF= signal. This is what input stream process and that process
+=getch= and =ungetch= want to simulate.
+
+#+BEGIN_SRC C :main no
+#define BUFSIZE 100
+
+char buf[BUFSIZE];              /* buffer for ungetch */
+int bufp = 0;                   /* next free position in buf */
+char isEOF = 0;                 /* the flag of EOF */
+
+int getch(void) {               /* get a (possibly pushed back) character */
+    return (isEOF) ? EOF :
+        (bufp > 0) ? buf[--bufp] : getchar();
+}
+
+void ungetch(int c) {           /* push character back on input */
+    if (c == EOF)
+        isEOF = 1;
+    else if (bufp >= BUFSIZE)
+        printf("ungetch: too many characters\n");
+    else
+        buf[bufp++] = c;
+}
+#+END_SRC
+**** Exercise 4-10
+Since our calculator uses the reverse Polish calculator, it doesn't need any
+lookahead since the behavior it should take it determined totally by the current
+input. This means that we don't need to use =getline= or have no advantage to
+use =getline= over =getch= and =ungetch=.
+
+And our calculator uses abstract layers upon the processors of input stream,
+=getch= and =ungetch=, we can minimize the change to the most primitive elements
+of this layer -- here we are going to alter only the functions that depends on
+=getch= and =ungetch= directly.
+
+Or furthermore, if we can mimics the behaviors of =getch= and =ungetch= using
+=getline= function, the user of =getch= and =ungetch= can not distinguish the
+difference.
+
+#+BEGIN_SRC C :tangle C_codes/ex4_10.c :main no
+#include <stdio.h>
+#include <stdlib.h>             /* for atof() */
+
+#define MAXOP 100               /* max size of operand or operator */
+#define NUMBER '0'              /* signal that a number was found */
+
+int getop(char []);
+void push (double);
+double pop(void);
+
+/* reverse Polish calculator */
+main() {
+    int type;
+    double op2;
+    char s[MAXOP];
+
+    while ((type = getop(s)) != EOF) {
+        switch (type) {
+            case NUMBER:
+                push(atof(s));
+                break;
+            case '+':
+                push(pop() + pop());
+                break;
+            case '*':
+                push(pop() * pop());
+                break;
+            case '-':
+                op2 = pop();
+                push(pop() - op2);
+                break;
+            case '/':
+                op2 = pop();
+                if (op2 != 0.0)
+                    push(pop() - op2);
+                else
+                    printf("error: zero divisor\n");
+                break;
+            case '\n':
+                printf("\t%.8g\n", pop());
+                break;
+            default:
+                printf("error: unknown command %s\n", s);
+                break;
+        }
+    }
+    return 0;
+}
+
+#define MAXVAL 100              /* maximum depth of val stack */
+
+int sp = 0;                     /* next free stack position */
+double val[MAXVAL];             /* value stack */
+
+/* push: push f onto value stack */
+void push(double f) {
+    if (sp < MAXVAL)
+        val[sp++] = f;
+    else
+        printf("error: stack full, can't push %g\n", f);
+}
+
+double pop(void) {
+    if (sp > 0)
+        return val[--sp];
+    else {
+        printf("error: stack empty\n");
+        return 0.0;
+    }
+}
+
+#include <ctype.h>
+
+int getch(void);
+void ungetch(void);
+
+/* getop: get next operator or numeric operand */
+int getop(char s[]) {
+    int i, c;
+
+    while ((s[0] = c = getch()) == ' ' || c == '\t')
+        ;
+    s[1] = '\0';
+    if (!isdigit(c) && c != '.')
+        return c;               /* not a number */
+    i = 0;
+    if (isdigit(c))             /* collect integer part */
+        while (isdigit(s[++i] = c = getch()))
+            ;
+    if (c == '.')               /* collect fractional part */
+        while (isdigit(s[++i] = c = getch()))
+            ;
+    s[i] = '\0';
+    ungetch();
+    return NUMBER;
+}
+
+#define MAXLINE 100
+
+int getLine(char line[], int limit);
+
+char line[MAXLINE];
+char linep = -1;                /* to initialize */
+int len = -1;                   /* to initialize */
+
+int getch(void) {               /* get a (possibly pushed back) character */
+    if (len == 0)               /* End of file */
+        return EOF;
+    if (linep < len) {
+        return line[linep++];
+    }
+    len = getLine(line, MAXLINE); /* Reach end of line */
+    linep = 0;
+    return getch();
+
+}
+
+void ungetch(void) {            /* revert the cursor point one character back */
+    if (linep > 0)
+        linep--;
+}
+
+int getLine(char s[], int lim)
+{
+    int c, i;
+    for (i = 0; i < lim-1 && (c=getchar()) != EOF && c != '\n'; ++i)
+        s[i] = c;
+    if (c == '\n') {
+        s[i] = c;
+        ++i;
+    }
+    s[i] = '\0';
+    return i;
+}
+#+END_SRC
+
+Let's test:
+#+BEGIN_SRC sh
+cd C_codes
+cc ex4_10.c -o expr
+#+END_SRC
+
+#+RESULTS:
+
+#+BEGIN_SRC sh :exports both :results verbatim
+echo "1 2 - 4 5 + *" | ./C_codes/expr
+echo "1.34 1.87 - 4 5 + *" | ./C_codes/expr
+#+END_SRC
+** Chapter 5 -- Pointers and Arrays
+#+BEGIN_SRC C :exports both :results verbatim
+int a[3][3] = {{1, 2, 3}, {4, 5, 6}, {7, 8, 9}};
+int *b[3] = {{1, 2, 3}, {4, 5, 6}, {7, 8, 9}};
+
+printf("the forth element of a is %d\n", *(a[0] + 3));
+/* printf("the forth element of b is %d\n", *(b[0] + 3)); */
+/* ↑doesn't work */
+printf("the size of *a is %u\n", sizeof(*a));
+printf("the size of *b is %u\n", sizeof(*b));
+#+END_SRC
+
+#+RESULTS:
+: the forth element of a is 4
+: the size of *a is 12
+: the size of *b is 8

@@ -22,6 +22,8 @@ main() {
     double vars['Z' - 'A' + 1]; /* the storage of variables */
     char isdefined['Z' - 'A' + 1]; /* flag for defined variables */
     int setvar = -1;               /* state for setting variable */
+    double lastValue = 0.0;        /* last printed value */
+    char everPrinted = 0;
     char s[MAXOP];
 
     int i;
@@ -98,7 +100,15 @@ main() {
                 initStack();
                 break;
             case '\n':
-                printf("\t%.8g\n", pop());
+                lastValue = pop();
+                everPrinted = 1;
+                printf("\t%.8g\n", lastValue);
+                break;
+            case '"':
+                if (!everPrinted)
+                    printf("error: there is no value calculated ever");
+                else
+                    push(lastValue);
                 break;
             default:
                 printf("error: unknown command %s\n", s);
