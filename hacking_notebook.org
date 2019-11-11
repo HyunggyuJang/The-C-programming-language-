@@ -5287,6 +5287,10 @@ Or furthermore, if we can mimics the behaviors of =getch= and =ungetch= using
 =getline= function, the user of =getch= and =ungetch= can not distinguish the
 difference.
 
+Here we are going to exploit the fact that we aren't concerned with reverting
+the input stream over the line -- we don't need to store the characters of
+previous line.
+
 #+BEGIN_SRC C :tangle C_codes/ex4_10.c :main no
 #include <stdio.h>
 #include <stdlib.h>             /* for atof() */
@@ -5424,6 +5428,9 @@ int getLine(char s[], int lim)
 }
 #+END_SRC
 
+We have used the same name as before to emphasize the changes we made to use
+=getLine= instead of buffered input stream.
+
 Let's test:
 #+BEGIN_SRC sh
 cd C_codes
@@ -5436,6 +5443,334 @@ cc ex4_10.c -o expr
 echo "1 2 - 4 5 + *" | ./C_codes/expr
 echo "1.34 1.87 - 4 5 + *" | ./C_codes/expr
 #+END_SRC
+
+#+RESULTS:
+: 	-9
+: 	-4.77
+
+*** Scope Rules
+C provides lexicographical scope rule as it would conventional programming
+language does.
+*** Header Files
+:PROPERTIES:
+:NOTER_PAGE: 74
+:END:
+
+Here we are going to divide the monolithic calculator program into several
+pieces. After dividing given program by their roles, we can compile as follows
+#+BEGIN_SRC sh
+cd C_codes
+cc main.c getop.c stack.c getch.c -o expr
+#+END_SRC
+
+Then we can use as
+#+BEGIN_SRC sh :exports both :results verbatim
+echo "1 2 - 4 5 + *" | ./C_codes/expr
+echo "1.34 1.87 - 4 5 + *" | ./C_codes/expr
+#+END_SRC
+
+#+RESULTS:
+: 	-9
+: 	-4.77
+
+Now we can maintain each routines in more modular way.
+
+**** Header file
+#+BEGIN_SRC C :tangle C_codes/calc.h :main no
+#define NUMBER '0'              /* signal that a number was found */
+void push (double);
+double pop(void);
+int getop(char []);
+int getch(void);
+void ungetch(int);
+#+END_SRC
+**** Main routine
+#+BEGIN_SRC C :tangle C_codes/main.c :main no
+#include <stdio.h>
+#include <stdlib.h>             /* for atof() */
+#include "calc.h"
+
+#define MAXOP 100               /* max size of operand or operator */
+
+/* reverse Polish calculator */
+main() {
+    int type;
+    double op2;
+    char s[MAXOP];
+
+    while ((type = getop(s)) != EOF) {
+        switch (type) {
+            case NUMBER:
+                push(atof(s));
+                break;
+            case '+':
+                push(pop() + pop());
+                break;
+            case '*':
+                push(pop() * pop());
+                break;
+            case '-':
+                op2 = pop();
+                push(pop() - op2);
+                break;
+            case '/':
+                op2 = pop();
+                if (op2 != 0.0)
+                    push(pop() - op2);
+                else
+                    printf("error: zero divisor\n");
+                break;
+            case '\n':
+                printf("\t%.8g\n", pop());
+                break;
+            default:
+                printf("error: unknown command %s\n", s);
+                break;
+        }
+    }
+    return 0;
+}
+#+END_SRC
+
+**** Stack routine
+#+BEGIN_SRC C :tangle C_codes/stack.c :main no
+#include <stdio.h>
+#include "calc.h"
+#define MAXVAL 100              /* maximum depth of val stack */
+
+int sp = 0;                     /* next free stack position */
+double val[MAXVAL];             /* value stack */
+
+/* push: push f onto value stack */
+void push(double f) {
+    if (sp < MAXVAL)
+        val[sp++] = f;
+    else
+        printf("error: stack full, can't push %g\n", f);
+}
+
+double pop(void) {
+    if (sp > 0)
+        return val[--sp];
+    else {
+        printf("error: stack empty\n");
+        return 0.0;
+    }
+}
+#+END_SRC
+
+**** =Getop= routine
+#+BEGIN_SRC C :tangle C_codes/getop.c :main no
+#include <stdio.h>
+#include <ctype.h>
+#include "calc.h"
+
+/* getop: get next operator or numeric operand */
+int getop(char s[]) {
+    int i, c;
+
+    while ((s[0] = c = getch()) == ' ' || c == '\t')
+        ;
+    s[1] = '\0';
+    if (!isdigit(c) && c != '.')
+        return c;               /* not a number */
+    i = 0;
+    if (isdigit(c))             /* collect integer part */
+        while (isdigit(s[++i] = c = getch()))
+            ;
+    if (c == '.')               /* collect fractional part */
+        while (isdigit(s[++i] = c = getch()))
+            ;
+    s[i] = '\0';
+    if (c != EOF)               /* ungetch cannot cope with EOF, which is not in char range */
+        ungetch(c);
+    return NUMBER;
+}
+#+END_SRC
+
+**** I/O routines
+#+BEGIN_SRC C :tangle C_codes/getch.c :main no
+#include <stdio.h>
+#define BUFSIZE 100
+
+char buf[BUFSIZE];              /* buffer for ungetch */
+int bufp = 0;                   /* next free position in buf */
+
+int getch(void) {               /* get a (possibly pushed back) character */
+    return (bufp > 0) ? buf[--bufp] : getchar();
+}
+
+void ungetch(int c) {           /* push character back on input */
+    if (bufp >= BUFSIZE)
+        printf("ungetch: too many characters\n");
+    else
+        buf[bufp++] = c;
+}
+#+END_SRC
+
+*** Static Variables
+External =static= declaration is used for hiding the /guts/ of specific
+functions that come to communicate using those.
+
+Whereas, the internal =static= declaration make the local variable to remain in
+existence rather than coming and going each time the function is activated.
+
+Using this, we can get rid of the =ungetch= and =getch= procedures in our
+calculator program:
+**** Exercise 4-11
+#+BEGIN_SRC C :tangle C_codes/getop_ex_11.c :main no
+#include <stdio.h>
+#include <ctype.h>
+#include "calc.h"
+
+/* getop: get next operator or numeric operand */
+int getop(char s[]) {
+    int i, c;
+    static char pushbacked = '\0';
+    static char hasPushbacked = 0;
+
+    while ((s[0] = c = (hasPushbacked ? (hasPushbacked = 0, pushbacked) : getchar())) == ' ' || c == '\t')
+        ;
+    s[1] = '\0';
+    if (!isdigit(c) && c != '.')
+        return c;               /* not a number */
+    i = 0;
+    if (isdigit(c))             /* collect integer part */
+        while (isdigit(s[++i] = c = (hasPushbacked ? (hasPushbacked = 0, pushbacked) : getchar())))
+            ;
+    if (c == '.')               /* collect fractional part */
+        while (isdigit(s[++i] = c = (hasPushbacked ? (hasPushbacked = 0, pushbacked) : getchar())))
+            ;
+    s[i] = '\0';
+    if (c != EOF)               /* ungetch cannot cope with EOF, which is not in char range */
+        hasPushbacked = 1, pushbacked = c;
+    return NUMBER;
+}
+#+END_SRC
+
+Here we used the same approach we took in [[*Exercise 4-8][Exercise 4-8]]. Then let's test.
+
+#+BEGIN_SRC sh
+cd C_codes
+cc main.c getop_ex_11.c stack.c -o expr
+#+END_SRC
+
+#+RESULTS:
+
+Then we can use as
+#+BEGIN_SRC sh :exports both :results verbatim
+echo "1 2 - 4 5 + *" | ./C_codes/expr
+echo "1.34 1.87 - 4 5 + *" | ./C_codes/expr
+#+END_SRC
+
+#+RESULTS:
+: 	-9
+: 	-4.77
+*** Recursion
+**** Exercise 4-12
+As we mentioned earlier, we have not method to slicing the given array, we have
+to pass the alternative one -- the index.
+
+#+BEGIN_SRC C :main no
+#include <stdio.h>
+
+/* itoa_recur: recursive process of itoa take the current
+   index and return updated index */
+int itoa_recur(int n, char s[], int ind) {
+    if (n / 10)
+        ind = itoa_recur(n / 10, s, ind);
+    s[ind++] = n % 10 + '0';
+    return ind;
+}
+
+void itoa(int n, char s[]) {
+    int sign;
+    int i = 0;
+    if ((sign = n) < 0) {
+        n = -n;
+        s[i++] = '-';
+    }
+    if (n / 10)
+        i = itoa_recur(n / 10, s, i);
+    s[i++] = n % 10 + '0';
+    s[i] = '\0';
+}
+
+int main(void) {
+    int n = -151;
+    char s[10];
+    itoa(n, s);
+    printf("%d got converted as %s", n, s);
+    return 0;
+}
+#+END_SRC
+
+#+RESULTS:
+: -151 got converted as -151
+**** Exercise 4-13
+Same as before, we pass over the index to the subsequent recursive calls.
+#+BEGIN_SRC C :main no
+#include <stdio.h>
+#include <string.h>
+
+void reverse_recur(char s[], int start, int end) {
+    if (start >= end)           /* base case */
+        return;
+    int t = s[start];
+    s[start++] = s[end];
+    s[end--] = t;
+    reverse_recur(s, start, end);
+}
+
+void reverse(char s[]) {
+    int lastInd = strlen(s) - 1;
+    if (lastInd < 1)            /* base case */
+        return;
+    int i = 0;
+    int t = s[i];
+    s[i++] = s[lastInd];
+    s[lastInd--] = t;
+    reverse_recur(s, i, lastInd);
+}
+
+int main(void) {
+    char s[] = "Test String";
+    char t[strlen(s)];
+    int i;
+    for (i = 0; t[i] = s[i]; ++i) /* copy s to t */
+        ;
+    reverse(s);
+    printf("%s got reversed to %s", t, s);
+    return 0;
+}
+#+END_SRC
+
+#+RESULTS:
+: Test String got reversed to gnirtS tseT
+*** The C Preprocessor
+Exploit this preprocessor, we can alleviate the work of run-time execution.
+**** Exercise 4-14
+Here we need to define temporary variable as we did in =swap= before; and also
+we should ensure that the temporary variable's name should be unique --
+different from =x=, and =y=, which are arguments.
+
+#+BEGIN_SRC C :main no
+#define swap(t, x, y) \
+    {t x ## y = x; x = y; y = x ## y;}
+
+int main(void) {
+    int x = 5;
+    int y = 2;
+    printf("%d and %d got swaped as", x, y);
+    swap(int, x, y);
+    printf(" %d and %d", x, y);
+    return 0;
+}
+#+END_SRC
+
+#+RESULTS:
+: 5 and 2 got swaped as 2 and 5
+
 ** Chapter 5 -- Pointers and Arrays
 #+BEGIN_SRC C :exports both :results verbatim
 int a[3][3] = {{1, 2, 3}, {4, 5, 6}, {7, 8, 9}};
