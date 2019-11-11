@@ -5671,7 +5671,7 @@ echo "1.34 1.87 - 4 5 + *" | ./C_codes/expr
 As we mentioned earlier, we have not method to slicing the given array, we have
 to pass the alternative one -- the index.
 
-#+BEGIN_SRC C :main no
+#+BEGIN_SRC C :main no :exports both
 #include <stdio.h>
 
 /* itoa_recur: recursive process of itoa take the current
@@ -5707,9 +5707,10 @@ int main(void) {
 
 #+RESULTS:
 : -151 got converted as -151
+
 **** Exercise 4-13
 Same as before, we pass over the index to the subsequent recursive calls.
-#+BEGIN_SRC C :main no
+#+BEGIN_SRC C :main no :exports both
 #include <stdio.h>
 #include <string.h>
 
@@ -5747,6 +5748,7 @@ int main(void) {
 
 #+RESULTS:
 : Test String got reversed to gnirtS tseT
+
 *** The C Preprocessor
 Exploit this preprocessor, we can alleviate the work of run-time execution.
 **** Exercise 4-14
@@ -5754,7 +5756,7 @@ Here we need to define temporary variable as we did in =swap= before; and also
 we should ensure that the temporary variable's name should be unique --
 different from =x=, and =y=, which are arguments.
 
-#+BEGIN_SRC C :main no
+#+BEGIN_SRC C :main no :exports both
 #define swap(t, x, y) \
     {t x ## y = x; x = y; y = x ## y;}
 
