@@ -5772,6 +5772,79 @@ int main(void) {
 : 5 and 2 got swaped as 2 and 5
 
 ** Chapter 5 -- Pointers and Arrays
+*** Pointers and Function Arguments
+**** Exercise 5-1
+I think to make the C code concise, we need to eliminate the not wanted case.
+Here we used that characteristic property to deduce the code, which is logically consistent.
+#+BEGIN_SRC C :main no :tangle C_codes/ex5_1.c
+#include <ctype.h>
+#include <stdio.h>
+
+int getch(void);
+void ungetch(int);
+
+/* getint: get next integer from input into *pn */
+int getint(int *pn) {
+    int c, sign = 1;
+
+    while (isspace(c = getch())) /* skip white space */
+        ;
+    if (!isdigit(c) && c != EOF) { /* ensure c is digit */
+        if (c != '+' && c != '-') { /* ensure c is sign token */
+            ungetch(c);
+            return 0;
+        }
+        char signExp = c;
+        c = getch();            /* lookahead */
+        if (!isdigit(c)) {
+            if (c != EOF)
+                ungetch(c);         /* pushback */
+            ungetch(signExp);       /* sign is not number */
+            return 0;
+        }
+        sign = (signExp == '-') ? -1 : 1;
+    }
+    for (*pn = 0; isdigit(c); c = getch())
+        ,*pn = *pn * 10 + (c - '0');
+    ,*pn *= sign;
+    if (c != EOF)
+        ungetch(c);
+    return c;
+}
+
+int main(void) {
+    int x = 0;
+    getint(&x);
+    printf("The input stream is integer %d\n", x);
+    return 0;
+}
+#+END_SRC
+
+#+RESULTS:
+
+#+BEGIN_SRC sh
+cd C_codes
+cc ex5_1.c getch.c -o current
+#+END_SRC
+
+#+RESULTS:
+
+#+BEGIN_SRC sh :exports both :results verbatim
+echo - 100 | ./C_codes/current
+echo -100 | ./C_codes/current
+printf "-100" | ./C_codes/current
+printf " -100" | ./C_codes/current
+#+END_SRC
+
+#+RESULTS:
+: The input stream is integer 0
+: The input stream is integer -100
+: The input stream is integer 0
+: The input stream is integer -100
+
+I don't know why the third test case won't work.
+
+*** Pointers vs. Multi-dimensional Arrays
 #+BEGIN_SRC C :exports both :results verbatim
 int a[3][3] = {{1, 2, 3}, {4, 5, 6}, {7, 8, 9}};
 int *b[3] = {{1, 2, 3}, {4, 5, 6}, {7, 8, 9}};
