@@ -1,11 +1,3 @@
-#include <stdio.h>
-#include <ctype.h>
-
-
-
-
-
-
 int getLine(char *s, int lim) {
     int c;
     int tLim = lim;

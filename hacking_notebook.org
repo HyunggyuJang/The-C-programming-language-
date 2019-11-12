@@ -6369,8 +6369,258 @@ cc ex5_10.c stack.c -o expr
 #+RESULTS:
 
 #+BEGIN_SRC sh :exports both :results verbatim
-./C_codes/expr 2 3 4 + \*
+./C_codes/expr 2 3 4 + - 5 \*
 #+END_SRC
 
 #+RESULTS:
-: 	14
+: 	-25
+**** Exercise 5-11
+
+#+BEGIN_SRC C :main no :tangle C_codes/ex5_11_entab.c
+
+#include <stdio.h>
+#include <stdlib.h>             /* for atoi */
+int main(int argc, char *argv[]) {
+    int c;
+    int ncolumn = 0;
+    int nexttabstop;
+    int nentry;
+    int tabstop = 4;            /* default tabstop */
+
+    if (argc > 2) {
+        printf("Usage: entab TABSTOP\n");
+        return 0;
+    }
+
+    if (argc == 2)
+        tabstop = atoi(argv[argc - 1]);
+
+    c = getchar();
+    while (c != EOF) {
+        if (c == ' ') {
+            nentry = ncolumn;
+            ++ncolumn;
+            nexttabstop = ncolumn + (tabstop - (ncolumn % tabstop));
+            while (ncolumn != nexttabstop && (c = getchar()) == ' ') {
+                ++ncolumn;
+            }
+            if (ncolumn == nexttabstop) {
+                putchar('\t');
+                c = getchar();  /* to agree with next branch */
+            } else {
+                while(nentry != ncolumn) {
+                    putchar(' ');
+                    ++nentry;
+                }
+            }
+        } else {
+            putchar(c);
+            if (c == '\n')
+                ncolumn = 0;
+            else ++ncolumn;
+            c = getchar();      /* to agree with above if branch */
+        }
+    }
+}
+#+END_SRC
+
+
+#+BEGIN_SRC C :main no :tangle C_codes/ex5_11_detab.c
+#include <stdio.h>
+#include <stdlib.h>             /* for atoi */
+#define TABSTOP 4                     /* Tab stop */
+
+int expandtab(int columnIndex);
+
+int main(int argc, char *argv[]) {
+    int c;
+    int ncolumn = 0;
+    int tabstop = 4;            /* default tabstop */
+
+    if (argc > 2) {
+        printf("Usage: detab TABSTOP\n");
+        return 0;
+    }
+
+    if (argc == 2)
+        tabstop = atoi(argv[argc - 1]);
+
+    while ((c = getchar()) != EOF) {
+        if (c == '\t')
+            ncolumn = expandtab(ncolumn); /* update column number */
+        else {
+            putchar(c);
+            if (c == '\n')
+                ncolumn = 0;    /* initialize column number */
+            else ++ncolumn;     /* increase column number */
+        }
+    }
+}
+
+int expandtab(int nc) {
+    if ((nc % TABSTOP) == 0) {
+        putchar(' ');
+        ++nc;
+    }
+    while((nc % TABSTOP) != 0) {
+        putchar(' ');
+        ++nc;
+    }
+    return nc;
+}
+#+END_SRC
+**** Exercise 5-12
+
+Before to add new feature to our current =detab= and =entab=, we are going to
+refactor the code; the current one is nasty since it was made in naive approach
+and at that moment we didn't have good sense of programming in C.
+
+Now we should be better than that time. So it's time to refactor such clutters.
+
+***** Refactoring =detab=
+
+- The =main= routine should be simple as it just delegate real works to the
+  subroutines based on the current input character.
+- Since =detab= doesn't need to lookahead, only =main= can access to the current
+  character.
+- =Tabstop= and =ncolumn= should be global variable since subroutines should
+  adjust the column line number as it process.
+
+#+BEGIN_SRC C :main no :tangle C_codes/ex5_11_detab_refactored.c
+#include <stdio.h>
+#include <stdlib.h>             /* for atoi */
+
+int tabstop = 4;            /* default tabstop */
+int ncolumn = 0;
+
+void expandtab(void);
+
+int main(int argc, char *argv[]) {
+    int c;
+
+    if (argc > 2) {
+        printf("Usage: detab TABSTOP\n");
+        return 0;
+    }
+
+    if (argc == 2)
+        tabstop = atoi(argv[argc - 1]);
+
+    while ((c = getchar()) != EOF) {
+        switch(c) {
+            case '\t':
+                expandtab();
+                break;
+            case '\n':
+                putchar('\n');
+                ncolumn = 0;
+                break;
+            default:
+                putchar(c);
+                ncolumn++;
+        }
+    }
+}
+
+void expandtab() {
+    putchar(' '), ncolumn++;    /* remove boundary case */
+    int remainingSpace = tabstop - ncolumn % tabstop;
+    while (remainingSpace-- > 0)
+        putchar(' '), ncolumn++;
+}
+#+END_SRC
+
+Then let's test:
+#+BEGIN_SRC sh
+cd C_codes/
+cc ex5_11_detab_refactored.c -o detab
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes
+printf "this   	tab	tab" | ./detab
+#+END_SRC
+
+#+RESULTS:
+: this        tab     tab
+
+***** Refactoring =entab=
+In the same manner as =detab=, the main should be simple enough to just pass
+over tasks to appropriate subroutines; subroutines should be simple enough to
+concentrate on their job. However unlike =detab=, the subroutines encounters the
+situation where it needs to lookahead to decide what it should do.
+
+First, let's refactor the =main= routine to delegate all real works into
+subroutines and then using the specifications used in =main= routine we can
+implement the subroutines. Here is the result:
+#+BEGIN_SRC C :main no :tangle C_codes/ex5_11_entab_refactored.c
+#include <stdio.h>
+#include <stdlib.h>             /* for atoi */
+
+void dealWithSpace(void);
+int getch(void);
+void ungetch(int c);
+
+int ncolumn = 0;
+int tabstop = 4;
+
+
+int main(int argc, char *argv[]) {
+    int c;
+
+    if (argc > 2) {
+        printf("Usage: entab TABSTOP\n");
+        return 0;
+    }
+
+    if (argc == 2)
+        tabstop = atoi(argv[argc - 1]);
+
+    while ((c = getch()) != EOF) {
+        switch (c) {
+            case ' ':
+                dealWithSpace();
+                break;
+            case '\n':
+                putchar('\n');
+                ncolumn = 0;
+                break;
+            default:
+                putchar(c);
+                ncolumn++;
+                break;
+
+        }
+    }
+}
+
+void dealWithSpace(void) {
+    int nentry = ncolumn;       /* store current column position */
+    int isblank;               /* the remaining blanks to reach next tab stop */
+    int c;
+    ++ncolumn;                 /* remove boundary case */
+    for (isblank = tabstop - ncolumn % tabstop; isblank && (c = getch()) == ' '; ++ncolumn, --isblank)
+        ;
+    if (!isblank) {           /* tabstop */
+        putchar('\t');
+        return;
+    }
+    while (nentry++ < ncolumn)
+        putchar(' ');
+    if (c != EOF)
+        ungetch(c);             /* overshot */
+}
+#+END_SRC
+
+Then let's test:
+#+BEGIN_SRC sh
+cd C_codes/
+cc ex5_11_entab_refactored.c getch.c -o entab
+#+END_SRC
+
+#+RESULTS:
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes
+printf "this   	tab	tab" | ./detab | ./entab
+#+END_SRC
