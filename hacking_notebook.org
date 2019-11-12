@@ -6477,7 +6477,7 @@ and at that moment we didn't have good sense of programming in C.
 
 Now we should be better than that time. So it's time to refactor such clutters.
 
-***** Refactoring =detab=
+***** Refactoring =detab= & Implementing new feature
 
 - The =main= routine should be simple as it just delegate real works to the
   subroutines based on the current input character.
@@ -6544,7 +6544,148 @@ printf "this   	tab	tab" | ./detab
 #+RESULTS:
 : this        tab     tab
 
-***** Refactoring =entab=
+Then now we need to make =detab= accept =-m= and =+n= arguments in commandline.
+This cause change in =main= routine to parse the arguments to setup
+appropriately; and also =expandtab()= to deal with =-m= feature. Let us first
+support =-m= in =expandtab()=.
+
+This quite straightforward expansion; the only change is that now we need
+compare current column line with the starting tabstop, =m= to calculate
+=remainingSpace=:
+#+BEGIN_SRC C
+void expandtab() {
+    putchar(' '), ncolumn++;    /* remove boundary case */
+    int distFromStartTab = ncolumn - startTab
+    int remainingSpace =
+        (distFromStartTab > 0) ? tabstop - distFromStartTab % tabstop: -distFromStartTab;
+    while (remainingSpace-- > 0)
+        putchar(' '), ncolumn++;
+}
+#+END_SRC
+
+Now let's make the =main= to parse the arguments appropriately:
+#+BEGIN_SRC C
+int startTab = 2;               /* default startTab */
+int tabstop = 4;            /* default tabstop */
+int ncolumn = 0;
+
+int main(int argc, char *argv[]) {
+    int c;
+
+    while (--argc > 0)
+        switch (c = (*++argv)[0]) {
+            case '+':
+                tabstop = atoi(++argv[0]);
+                break;
+            case '-':
+                startTab = atoi(++argv[0]);
+                break;
+            default:
+                printf("detab: illegal option %s, instead use default setting", argv[0]);
+                break;
+        }
+
+    while ((c = getchar()) != EOF) {
+        switch(c) {
+            case '\t':
+                expandtab();
+                break;
+            case '\n':
+                putchar('\n');
+                ncolumn = 0;
+                break;
+            default:
+                putchar(c);
+                ncolumn++;
+        }
+    }
+}
+#+END_SRC
+
+Here we chose to overwrite previous setting if it encounters yet another options.
+
+Let's combine all of the works:
+#+BEGIN_SRC C :tangle C_codes/ex5_12_detab.c
+#include <stdio.h>
+#include <stdlib.h>             /* for atoi */
+
+#define STARTTAB 2
+#define TABSTOP 4
+
+void expandtab(void);
+int startTab = 2;               /* default startTab */
+int tabstop = 4;            /* default tabstop */
+int ncolumn = 0;
+
+int main(int argc, char *argv[]) {
+    int c;
+
+    while (--argc > 0)
+        switch (c = (*++argv)[0]) {
+            case '+':
+                tabstop = atoi(++argv[0]);
+                break;
+            case '-':
+                startTab = atoi(++argv[0]);
+                break;
+            default:
+                printf("detab: illegal option \'%s\', instead use default setting\n", argv[0]);
+                tabstop = TABSTOP;
+                startTab = STARTTAB;
+                break;
+        }
+
+    while ((c = getchar()) != EOF) {
+        switch(c) {
+            case '\t':
+                expandtab();
+                break;
+            case '\n':
+                putchar('\n');
+                ncolumn = 0;
+                break;
+            default:
+                putchar(c);
+                ncolumn++;
+        }
+    }
+}
+
+void expandtab(void) {
+    putchar(' '), ncolumn++;    /* remove boundary case */
+    int distFromStartTab = ncolumn - startTab;
+    int remainingSpace =
+        (distFromStartTab > 0) ? tabstop - distFromStartTab % tabstop: -distFromStartTab;
+    while (remainingSpace-- > 0)
+        putchar(' '), ncolumn++;
+}
+#+END_SRC
+
+Then let's test:
+#+BEGIN_SRC sh
+cd C_codes/
+cc ex5_12_detab.c -o detab
+#+END_SRC
+
+#+RESULTS:
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes
+printf "	this   	tab	tab\n" | ./detab #default setting
+printf "	this   	tab	tab\n" | ./detab -5 #tweak startTab
+printf "	this   	tab	tab\n" | ./detab -5 +2 #tweak startTab & tabstop
+printf "	this   	tab	tab\n" | ./detab -5 +2 power #include invalid option
+#+END_SRC
+
+#+RESULTS:
+:   this        tab     tab
+:      this        tab     tab
+:      this      tab   tab
+: detab: illegal option 'power', instead use default setting
+:   this        tab     tab
+
+
+***** Refactoring =entab= & Implementing new feature
 In the same manner as =detab=, the main should be simple enough to just pass
 over tasks to appropriate subroutines; subroutines should be simple enough to
 concentrate on their job. However unlike =detab=, the subroutines encounters the
@@ -6624,3 +6765,127 @@ cc ex5_11_entab_refactored.c getch.c -o entab
 cd C_codes
 printf "this   	tab	tab" | ./detab | ./entab
 #+END_SRC
+
+Let turn to new commandline argument; as usual, first we are going to modify
+=dealWithSpace=:
+#+BEGIN_SRC C
+void dealWithSpace(void) {
+    int nentry = ncolumn;       /* store current column position */
+    int distFromStartTab = ncolumn - startTab;
+    int isblank;               /* the remaining blanks to reach next tab stop */
+    int c;
+    ++ncolumn;                 /* remove boundary case */
+    for (isblank = (distFromStartTab > 0) ? tabstop - distFromStartTab % tabstop: -distFromStartTab;
+         isblank && (c = getch()) == ' '; ++ncolumn, --isblank)
+        ;
+    if (!isblank) {           /* tabstop */
+        putchar('\t');
+        return;
+    }
+    while (nentry++ < ncolumn)
+        putchar(' ');
+    if (c != EOF)
+        ungetch(c);             /* overshot */
+}
+#+END_SRC
+
+As the code change is exactly same as =detab= we could capture this commonality
+with new function, namely =nextTabstop()=. For now let it be as it is.
+
+Now main: This is also same as =detab=. So the final code would be
+#+BEGIN_SRC C :tangle C_codes/ex5_12_entab.c
+#include <stdio.h>
+#include <stdlib.h>             /* for atoi */
+
+#define TABSTOP 4
+#define STARTTAB 2
+
+void dealWithSpace(void);
+int getch(void);
+void ungetch(int c);
+
+int ncolumn = 0;
+int tabstop = TABSTOP;
+int startTab = STARTTAB;
+
+
+int main(int argc, char *argv[]) {
+    int c;
+
+    while (--argc > 0)
+        switch (c = (*++argv)[0]) {
+            case '+':
+                tabstop = atoi(++argv[0]);
+                break;
+            case '-':
+                startTab = atoi(++argv[0]);
+                break;
+            default:
+                printf("entab: illegal option \'%s\', instead use default setting\n", argv[0]);
+                tabstop = TABSTOP;
+                startTab = STARTTAB;
+                break;
+        }
+
+    while ((c = getch()) != EOF) {
+        switch (c) {
+            case ' ':
+                dealWithSpace();
+                break;
+            case '\n':
+                putchar('\n');
+                ncolumn = 0;
+                break;
+            default:
+                putchar(c);
+                ncolumn++;
+                break;
+
+        }
+    }
+}
+
+void dealWithSpace(void) {
+    int nentry = ncolumn++;       /* store current column position */
+    int isblank;               /* the remaining blanks to reach next tab stop */
+    int c;
+    int distFromStartTab = ncolumn - startTab;
+
+    for (isblank = (distFromStartTab > 0) ? tabstop - distFromStartTab % tabstop : -distFromStartTab;
+         isblank && (c = getch()) == ' '; ++ncolumn, --isblank)
+        ;
+    if (!isblank) {           /* tabstop */
+        putchar('\t');
+        return;
+    }
+    while (nentry++ < ncolumn)
+        putchar(' ');
+    if (c != EOF)
+        ungetch(c);             /* overshot */
+}
+#+END_SRC
+
+#+BEGIN_SRC sh
+cd C_codes
+cc ex5_12_entab.c getch.c -o entab
+#+END_SRC
+
+#+RESULTS:
+
+
+Then test:
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes
+printf "	this   	tab	tab\n" | ./detab | ./entab #default setting
+printf "	this   	tab	tab\n" | ./detab -5 | ./entab -5 #tweak startTab
+printf "	this   	tab	tab\n" | ./detab -5 +2 | ./entab -5 +2 #tweak startTab & tabstop
+printf "	this   	tab	tab\n" | ./detab -5 +2 power | ./entab -5 +2 power #include invalid option
+#+END_SRC
+
+#+RESULTS:
+: 	this		tab	tab
+: 	this		tab	tab
+: 	this			tab	tab
+: entab: illegal option 'power', instead use default setting
+: detab: illegal option 'power', instead use default setting
+: 	this		tab	tab
