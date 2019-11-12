@@ -6876,16 +6876,86 @@ cc ex5_12_entab.c getch.c -o entab
 Then test:
 #+BEGIN_SRC sh :exports both :results verbatim
 cd C_codes
-printf "	this   	tab	tab\n" | ./detab | ./entab #default setting
-printf "	this   	tab	tab\n" | ./detab -5 | ./entab -5 #tweak startTab
-printf "	this   	tab	tab\n" | ./detab -5 +2 | ./entab -5 +2 #tweak startTab & tabstop
-printf "	this   	tab	tab\n" | ./detab -5 +2 power | ./entab -5 +2 power #include invalid option
+printf "	this		tab	tab\n" | ./detab | ./entab #default setting
+printf "	this		tab	tab\n" | ./detab -5 | ./entab -5 #tweak startTab
+printf "	this		tab	tab\n" | ./detab -5 +2 | ./entab -5 +2 #tweak startTab & tabstop
+printf "	this		tab	tab\n" | ./detab -5 +2 power | ./entab -5 +2 power #include invalid option
 #+END_SRC
 
 #+RESULTS:
 : 	this		tab	tab
 : 	this		tab	tab
-: 	this			tab	tab
+: 	this		tab	tab
 : entab: illegal option 'power', instead use default setting
 : detab: illegal option 'power', instead use default setting
 : 	this		tab	tab
+**** Exercise 5-13
+This exercise has quite complicated constraint than usual; actually what the
+statement want us to do is implement heap memory management system, which
+happens to be used for =tail= program. As you know, heap memory management
+system should involve garbage collecting algorithm to reuse the finite memory
+economically.
+
+So, we need to implement heap memory system, which will start with one
+monolithic free memory at which data are going to be stored.
+
+Since this memory management system is just for =tail= process, we can exploit
+the way it stores data into heap. Here is the idea:
+
+1. Prepare one monolithic memory to which data going to be stored.
+2. Start to allocate each data into that memory from the starting pointer of it.
+3. If given data would cause overflow of the heap memory, it need to calculate
+   to decide whether the heap memory is full with useful memory so it can not be
+   used anymore. That is,
+4. it first find out the first pointer of useful data -- the ones held by
+   =tail=; if the available memory from the last pointer to that first pointer
+   accounting wrapping afford to allocate requested new data, then it start to
+   clean up garbages in current memory and then allocate new data.
+5. Else, the heap has no memory available to allocate the requested data; it
+   should signal this fact to the user.
+
+
+In the above informal description, we exploited the fact the =tail='s data would
+be allocated sequentially; so we can calculate the first pointer of useful data
+in our heap. Note that we have to provide another same size of memory as
+currently used heap to cleanup safely.
+
+We could use the heap memory in other way: Not cleanup explicitly the memory
+when it needs to, just explicitly wrap the data itself; it would be more
+efficiently than above one since it never modify any datum once it allocates
+that in heap, and thus doesn't need to provide another any auxiliary memory
+standing by to be used when it comes to need to be cleanup.
+
+In either implementation, we can cope with any arbitrary length of input line
+since allocation ensured to be done sequentially. This deals with the constrain
+of /unreasonable input/. The rest constraint is trivial -- just use default /n/
+if it is unrealistic.
+
+Finally, we should deal with the case where the current line is too big to be
+allocated but, at the end, turns out it was not needed at all; the last /n/
+lines can safely fit into given heap. To work around this, we should not abort
+as soon as our heap is full with useful data -- it should wait until the end of
+input stream destroying from the first stored data if current heap is full.
+
+And then after the input stream end, if the pointer array ever hold pointer to
+the destroyed line, then it can complaint this fact to the user. Otherwise, that
+is, if there is no destruction at all in process or the destroyed ones replaced
+by unharmed ones, it should prints the last /n/ lines as normal.
+
+This exercise involves multiple abstraction layer in it, that is, the user of
+function that allocates last /n/ lines, function that prints those at the top
+level.
+
+In turn, the line allocating function use heap data structure with input
+functions, and print function which uses the information line allocator produced
+and output functions.
+
+At the very low level there is I/O functions and heap data representation.
+
+Can we implement this layered structure in C naturally? We have used to do that
+in Scheme, but in C we have rarely cared about that; all information got
+cluttered up so one can not easily be divided into one independent unit.
+
+So for here, we will deal with those abstract concepts to implement =tail=
+program. It would be great help when we try to design and implement more
+complicated program and the ones that has nasty specifications.
