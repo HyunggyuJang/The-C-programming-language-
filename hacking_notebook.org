@@ -6959,3 +6959,455 @@ cluttered up so one can not easily be divided into one independent unit.
 So for here, we will deal with those abstract concepts to implement =tail=
 program. It would be great help when we try to design and implement more
 complicated program and the ones that has nasty specifications.
+
+***** =Main= routine
+
+First, let us start from the very top level as usual. Using the type constraint
+we defined in this implementation, we are going to implement subsequent below
+level's functions.
+
+The =main= should
+- parse the command line arguments;
+- set that option to the given variable;
+- give control to the readline process;
+- error check based on the value returned from readline process;
+- give control to the writeline process;
+- end of the process.
+
+#+BEGIN_SRC C
+#define DEFAULTN 10
+
+int n = DEFAULTN;
+
+enum {ERROR = -1, SUCCESS = 0};
+
+int
+main(int argc, char *argv[])
+{
+    parseCommand(argc, argv);
+
+    if (readLineWrappedN(???) == ERROR)
+        return error("error: tail's heap is full with last %d lines", n);
+    writeLineWrappedN(???);
+    return 0;
+}
+#+END_SRC
+
+We haven't decided what =readLineWrappedN= should take and return but it should
+signal how the process ended when it return the control to =main=. It is also
+true for =writeLineWrappedN=. The only concrete process would be =parseComamnd=. Let
+us tackle that first.
+
+The =parseCommand= should
+- parse the argument until there is no more argument left to parse;
+
+
+This is exactly same process with that of =find=:
+
+#+BEGIN_SRC C
+void
+parseCommand(int argc, char *argv[]) {
+    while (--argc > 0 && (*++argv)[0] == '-')
+        if (isdigit(*++argv[0]))
+            n = atoi(argv[0]);
+        else {
+            printf("tail: %s is not number, default value used instead\n", argv[0]);
+            n = DEFAULTN;
+        }
+    if (argc != 1) {
+        printf("tail: illegal arguments will be ignored\n");
+        printf("Usage: tail [-n]\n");
+    }
+    if (n < 1)                  /* unrealistic value */
+        n = DEFAULTN;
+}
+#+END_SRC
+
+Let's delegate the other specifications into subroutines.
+
+***** =ReadLineWrappedN= subroutine
+This procedure should
+- call =getline= procedure to take line from input stream;
+- if =getline= terminate normally, it should call =allocateWrapped=;
+- as =allocatedWrapped= return the control with newly allocated pointer, it
+  should call =installWrapped= to install given line into the memory;
+- then if it installed with out any abnormal, it should put the current pointer
+  into the queue like data structure, which holds pointers to last /n/ lines.
+
+
+We have not described what happening in =allocatedWrapped= and =installWrapped=
+since it doesn't have to know about the heap and queue data structure. It is
+enough for =realLindWrapped= to update appropriately.
+
+The only tricky point is that when the line returned by =getline= overflowed. In
+that case, it should link the current line with the subsequent line, which will
+be got from next loop. Here is the code:
+#+BEGIN_SRC C :main no :tangle C_codes/readLineWrappedN.c
+#define MAXLEN 20
+#include "ex5_13.h"
+
+int isOverflowed(char *, int, int);
+int getLine(char *, int);
+
+int
+readLineWrappedN()
+{
+    char line[MAXLEN];          /* current input line */
+    int len;
+    char overflowed = 0;
+    char shouldInsert;
+    char isWrapped = 0;
+    char *p;
+    while ((len = getLine(line, MAXLEN)) > 0)
+    {
+        shouldInsert = !overflowed;
+        if ((overflowed = isOverflowed(line, len, MAXLEN)))
+            len -= 1;           /* remove last null character to link with next */
+        else if (line[len - 1] == '\n')        /* not last line */
+            line[--len] = '\0'; /* remove newline character */
+        isWrapped = 0;          /* initialize isWrapped */
+        p = allocWrapped(len + 1, &isWrapped); /* install until null character */
+        if (shouldInsert)
+            insertLast(p, isWrapped);
+        installWrapped(p, line, len + 1); /* install until null character */
+    }
+    if (existDestroyed())
+        return ERROR;
+    return SUCCESS;
+}
+
+int isOverflowed(char s[], int len, int lim) {
+    return (len == lim - 1) && (s[lim - 2] != '\n');
+}
+#+END_SRC
+
+We found out that it need to also control the whether current allocation wrapped
+or not.
+***** =AllocateWrapped=, =installWrapped=, heap representation, and queue representation
+Now we need to implement all the low level representations. Since our heap and
+queue, which holds pointers last /n/ lines, are mutually dependent as those
+exploits the fact that this is all for just =tail= program.
+
+First, =allocateWrapped= manage the free pointer as =alloc= did, and it should
+handle the wrapping case to calculate new free pointer. We will base on the
+=alloc= implementation in text book:
+
+#+BEGIN_SRC C :tangle C_codes/heapWrapped.c :main no
+#define ALLOCSIZE 100           /* size of available space */
+
+static char allocbuf[ALLOCSIZE]; /* storage for allocWrapped */
+static char *allocp = allocbuf;  /* next free position */
+
+char *allocWrapped(int n, char *isWrapped) {
+    if (allocbuf + ALLOCSIZE - allocp >= n) { /* it fits without wrapping */
+        allocp += n;
+        return allocp - n;      /* old p */
+    } else {                    /* should wrap */
+        n -= allocbuf + ALLOCSIZE - allocp; /* allocate until end of buffer and wrap */
+        ,*isWrapped = 1;
+        allocp = allocbuf;      /* wrapped */
+        return allocWrapped(++n, isWrapped); /* take account the null character since this string is broken */
+    }
+}
+
+char *firstPointer(void) {
+    return allocbuf;
+}
+
+char isLastPointer(char *p) {
+    return p == allocbuf + ALLOCSIZE - 1;
+}
+#+END_SRC
+
+Now we need to =installWrapped=; it should have access to the =allocbuf= in case
+it should install wrapping around, and it need to check also the current
+character pointer held by queue; if it is destroy that:
+#+BEGIN_SRC C :tangle C_codes/installWrapped.c :main no
+#include "ex5_13.h"
+#include <stdio.h>
+void installWrapped(char *p, char *line, int len) {
+    len--;
+    ,*p++ = *line++;             /* entry point should not be destroyed */
+    while (len-- > 0) {
+        if (isLastPointer(p))
+            destroyIfHeld(p), *p = '\0', p = firstPointer(); /* break current line */
+        destroyIfHeld(p);
+        ,*p++ = *line++;
+    }
+}
+#+END_SRC
+
+When now we are going to represent queue. It should support =insertLast=,
+=destroyIfHeld=, =existDestroyed=, and lastly =writeLineWrappedN=.
+
+#+BEGIN_SRC C :tangle C_codes/lastN.c :main no
+#include <stdlib.h>
+#include <stdio.h>
+#include "ex5_13.h"
+
+enum {DESTROYED = -1, UNDEFINED = 0, DEFINED = 1};
+
+static char **lastN;            /* pointer array holding last n lines */
+static char *flags;             /* flags for above array whether it defined or destroyed */
+static int next = 0;            /* index to be set next */
+static int wrapped = -1;        /* the index holding wrapped line */
+static int size;                /* size of pointer array */
+
+void setLastN(int n) {
+    lastN = malloc(sizeof(char *) * n);
+    flags = malloc(sizeof(char) * n);
+    size = n;
+    while (n-- > 0)             /* initialize flags */
+        flags[n] = UNDEFINED;
+    n = size;
+    while (n-- > 0)             /* initialize pointer array */
+        lastN[n] = NULL;
+}
+
+void insertLast(char *p, int isWrapped) {
+    if (isWrapped)
+        wrapped = next;
+    else if (wrapped == next)
+        wrapped = -1;           /* need to unset wrapped */
+    lastN[next] = p, flags[next++] = DEFINED;
+    if (next == size)           /* need to wrap */
+        next = 0;
+}
+
+int heldBy(char *p) {
+    int i = size;
+    while (i-- > 0)
+        if (lastN[i] == p)
+            return i;
+    return -1;
+
+}
+
+void destroyIfHeld(char *p) {
+    int i = heldBy(p);
+    if (i < 0)
+        return;
+    flags[i] = DESTROYED;
+}
+
+char existDestroyed(void) {
+    int i = size;
+    while (i-- > 0)
+        if (flags[i] == DESTROYED)
+            return 1;
+    return 0;
+}
+
+void writeLineWrappedN(void) {
+    int i = next;
+    do {
+        if (flags[i] != DEFINED)
+            continue;
+        if (i == wrapped)
+            printf("%s%s\n", lastN[i], firstPointer());
+        else
+            printf("%s\n", lastN[i]);
+    } while ((i = (i + 1) % size) != next); /* for wrapping case */
+}
+
+void inspectLastN(void) {
+    int i = size;
+    while (i-- > 0)
+        if (i == wrapped)
+            printf("current line is wrapped one. The first one is \n%s\nat heap index %d\nand the rest is\n%s\n",
+                   lastN[i], lastN[i] - firstPointer(), firstPointer());
+        else
+            printf("%s\nis stored at heap index %d\n", lastN[i], lastN[i] - firstPointer());
+}
+
+void freeLastN(void) {
+    free(lastN);
+    free(flags);
+}
+#+END_SRC
+
+Here we used =malloc= to allocate the queue data structure into the memory.
+***** Put all together
+Let's put all together. First the header file:
+#+BEGIN_SRC C :main no :tangle C_codes/ex5_13.h
+enum {ERROR = -1, SUCCESS = 0};
+
+int readLineWrappedN(void);
+void writeLineWrappedN(void);
+/* heap representations */
+char *allocWrapped(int, char *);
+char *firstPointer(void);
+char isLastPointer(char *);
+void installWrapped(char *, char *, int);
+/* queue representation */
+void setLastN(int);
+void freeLastN(void);
+void insertLast(char *, int);
+void destroyIfHeld(char *);
+char existDestroyed(void);
+void inspectLastN(void);
+#+END_SRC
+
+=Main= file got to be concrete:
+#+BEGIN_SRC C :tangle C_codes/ex5_13_main.c
+
+#include <stdio.h>
+#include <ctype.h>              /* for isdigit */
+#include <stdlib.h>             /* for atoi */
+#include "ex5_13.h"
+
+#define DEFAULTN 10
+
+static int n = DEFAULTN;
+
+void
+parseCommand(int argc, char *argv[]) {
+    while (--argc > 0 && (*++argv)[0] == '-')
+        if (isdigit(*++argv[0]))
+            n = atoi(argv[0]);
+        else {
+            printf("tail: %s is not number, default value used instead\n", argv[0]);
+            n = DEFAULTN;
+        }
+    if (argc) {
+        printf("tail: illegal arguments will be ignored\n");
+        printf("Usage: tail [-n]\n");
+    }
+    if (n < 1)                  /* unrealistic value */
+        n = DEFAULTN;
+}
+
+int
+main(int argc, char *argv[])
+{
+    parseCommand(argc, argv);
+    setLastN(n);
+    if (readLineWrappedN() == ERROR) {
+        printf("error: tail's heap is full with last %d lines\n", n);
+        return 0;
+    }
+    writeLineWrappedN();
+    /* inspectLastN(); */
+    freeLastN();
+    return 0;
+}
+#+END_SRC
+
+=getLine= subroutine:
+#+BEGIN_SRC C :tangle C_codes/getLine.c :main no
+#include <stdio.h>
+
+int getLine(char *s, int lim) {
+    int c;
+    int tLim = lim;
+    while (lim > 1 && (c = getchar()) != EOF && c != '\n')
+        ,*s++ = c, lim--;
+    if (c == '\n')
+        ,*s++ = c, lim--;
+    ,*s = '\0';
+    return tLim - lim;
+}
+#+END_SRC
+
+#+RESULTS:
+
+Then let's test:
+#+BEGIN_SRC sh
+cd C_codes
+cc ex5_13_main.c readLineWrappedN.c heapWrapped.c installWrapped.c lastN.c getLine.c -o tail
+#+END_SRC
+
+#+RESULTS:
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes
+printf "test\nline\nlike\nthis\n" | ./tail -10
+#+END_SRC
+
+#+RESULTS:
+: test
+: line
+: like
+: this
+
+The long line test
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes
+printf "This line is so long to be fit into the line that can be obtained in one getLine\nand yes.\n" | ./tail -10
+#+END_SRC
+
+#+RESULTS:
+: This line is so long to be fit into the line that can be obtained in one getLine
+: and yes.
+
+But it turns out sometimes it falls into infinite loop unexpected. After a
+couple of trial, we could find out the error in =allocateWrapped=:
+#+BEGIN_SRC C :tangle C_codes/heapWrapped_fixed.c :main no
+#define ALLOCSIZE 100           /* size of available space */
+
+static char allocbuf[ALLOCSIZE]; /* storage for allocWrapped */
+static char *allocp = allocbuf;  /* next free position */
+
+void calculateWrapped(int n) {
+    if (ALLOCSIZE >= n)        /* it fits without additional wrapping */
+        allocp += n;
+    else
+        calculateWrapped(n - ALLOCSIZE + 1); /* need additional wrapping */
+}
+
+char *allocWrapped(int n, char *isWrapped) {
+    char *returnPointer = allocp;
+    if (allocbuf + ALLOCSIZE - allocp >= n) { /* it fits without wrapping */
+        allocp += n;
+    } else {                    /* should wrap */
+        n -= allocbuf + ALLOCSIZE - allocp; /* allocate until end of buffer and wrap */
+        ,*isWrapped = 1;
+        allocp = allocbuf;      /* wrapped */
+        calculateWrapped(++n);  /* account null character for wrapping */
+    }
+    return returnPointer;       /* return old pointer */
+}
+
+
+char *firstPointer(void) {
+    return allocbuf;
+}
+
+char isLastPointer(char *p) {
+    return p == allocbuf + ALLOCSIZE - 1;
+}
+#+END_SRC
+
+The previous version has returned improper value in recursive case. It should
+have return the old pointer in any case.
+
+And after quite subtle debugging process,
+
+Now finally let's test:
+#+BEGIN_SRC sh
+cd C_codes
+cc ex5_13_main.c readLineWrappedN.c heapWrapped_fixed.c installWrapped.c lastN.c getLine.c -o tail
+#+END_SRC
+
+#+RESULTS:
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes
+printf "This line is so long to be fit into the line that can be obtained in one getLine\nand yes." | ./tail -2
+printf "And even this line is so huge that it can not be fit into even the provded heap not just getLine but is should signal this normally" | ./tail -1
+printf "And even this line is so huge that it can not be fit into even the provded heap not just getLine but is should signal this normally\nAnd that was not used." | ./tail -1
+printf "And even this line is so huge that it can not be fit into any one getLine process but fit in heap." | ./tail -1
+#+END_SRC
+#+RESULTS:
+: This line is so long to be fit into the line that can be obtained in one getLine
+: and yes.
+: error: tail's heap is full with last 1 lines
+: And that was not used.
+: And even this line is so huge that it can not be fit into any one getLine process but fit in heap.
+
+Now it works as expected; but it was quite hard to reason all of the bugs that
+wiggling beneath. We need to use smart unit test to eliminate such unfortunates
+but in this specific example, as all the routines got intertwined intimately, it
+is hard to do that.
+
+We need to consider good way to avoid from that.
