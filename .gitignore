@@ -1,3 +1,5 @@
 *.out
 notes.org
 todo.org
+/C_codes/Unity*
+/C_codes/cpputest*

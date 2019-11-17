@@ -1,0 +1,6 @@
+[submodule "C_codes/cpputest"]
+	path = C_codes/cpputest
+	url = https://github.com/cpputest/cpputest.git
+[submodule "C_codes/Unity"]
+	path = C_codes/Unity
+	url = https://github.com/ThrowTheSwitch/Unity.git

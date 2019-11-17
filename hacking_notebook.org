@@ -7411,3 +7411,666 @@ but in this specific example, as all the routines got intertwined intimately, it
 is hard to do that.
 
 We need to consider good way to avoid from that.
+*** Pointers to Functions
+
+Fortunately, even in C, we can pass the function into another function and
+return function as value as if it were higher order function at surface. But as
+noted before in the block structure section, we can not defined new function
+with in function block or more precisely, within any block which delimited by
+brackets.
+
+Then how we got to be able to use higher order type contraction in C -- as
+noted, although it is very restricted in behavior -- ? The answer is by using
+the pointer. Since function is also an object that should be stored in memory in
+definition time, we can use pointer to point that function object, and apply
+the result obtained by dereferencing that to arguments.
+
+First let us experiment with the code in the text. Since we haven't typed all
+the dependant programs that used in =sort=, first we start to type the library
+routines.
+
+And as we learend from previous exercise, it is way too hard debugging program
+that has a lot of mutually dependant subroutines. So here for practice, we add
+unit test to each of the subcomponents if possible. To do that, here we try to
+use =assert.h= library.
+
+=Alloc= and =afree=:
+#+BEGIN_SRC C :main no :tangle C_codes/alloc.c :results verbatim
+#define ALLOCSIZE 10000         /* size of available space */
+
+static char allocbuf[ALLOCSIZE]; /* storage for alloc */
+static char *allocp = allocbuf;  /* next free position */
+
+char *alloc(int n) {            /* return pointer to n characters */
+    if (allocbuf + ALLOCSIZE - allocp >= n) { /* it fits */
+        allocp += n;
+        return allocp - n;       /* old p */
+    } else                      /* not enough room */
+        return 0;
+}
+
+void afree(char *p) {           /* free storage pointed to by p */
+    if (p >= allocbuf && p < allocbuf + ALLOCSIZE)
+        allocp = p;
+}
+
+#include <assert.h>
+#include <string.h>
+/* testing alloc and free */
+int main_(void) {
+    int n = 10;
+    assert(allocp == allocbuf);        /* before allocating any, it should be initialzied */
+
+    char *teststring = alloc(n);
+    assert(teststring == allocbuf); /* the old pointer is bound to newly allocated data */
+
+    assert(allocp == allocbuf + n); /* after allocating n blocks, it should point to next free pointer */
+    strcpy(teststring, "123456789"); /* exactly n = 10 block size */
+
+    char *testAlloc = alloc(n);     /* new allocating */
+    assert(strcmp(teststring, "123456789") == 0); /* after allocating it should retain previosly allocated one */
+
+    assert(allocp == allocbuf + 2*n); /* before freeing the current pointer */
+    /* freeing */
+    afree(testAlloc);
+    assert(allocp == allocbuf + n); /* the last one freed */
+
+    afree(teststring);
+    assert(allocp == allocbuf);    /* reverted to initial pointer */
+    char *testLast = alloc(n);  /* make garbages */
+    strcpy(testLast, "987654321");                /* destroyed garbage */
+    assert(strcmp(teststring, "123456789") != 0); /* the previous one destructed */
+}
+#+END_SRC
+
+#+RESULTS:
+
+=Readlines=:
+#+BEGIN_SRC C :main no :tangle C_codes/readlines.c
+#include <string.h>
+#include <stdio.h>
+
+#define MAXLEN 1000             /* max length of any input line */
+int getLine(char *, int);
+char *alloc(int);
+
+/* readlines: read input lines */
+int readlines(char *lineptr[], int maxlines) {
+    int len, nlines;
+    char *p, line[MAXLEN];
+
+    nlines = 0;
+    while ((len = getLine(line, MAXLEN)) > 0)
+        if (nlines >= maxlines || (p = alloc(len)) == NULL)
+            return -1;
+        else {
+            line[len - 1] = '\0'; /* delete newline */
+            strcpy(p, line);
+            lineptr[nlines++] = p;
+        }
+    return nlines;
+}
+
+void writelines(char *lineptr[], int nlines) {
+    while (nlines-- > 0)
+        printf("%s\n", *lineptr++);
+}
+
+int main_(void) {
+    int maxlines = 100;
+    /* spit out what it read */
+    char *lineptr[maxlines];
+
+    int nlines = readlines(lineptr, maxlines);
+    writelines(lineptr, nlines);
+    return 0;
+}
+#+END_SRC
+
+As this function involves standard input and output, we can not easily implement
+the unit test style in C as we did =alloc=.
+
+So here is the test in manual:
+#+BEGIN_SRC sh
+cd C_codes
+cc readlines.c getLine.c alloc.c -o readlines_test
+#+END_SRC
+
+#+RESULTS:
+
+#+BEGIN_SRC sh :results verbatim :exports both
+cd C_codes
+./readlines_test < readlines.c
+printf "test" | ./readlines_test
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+#include <string.h>
+#include <stdio.h>
+
+#define MAXLEN 1000             /* max length of any input line */
+int getLine(char *, int);
+char *alloc(int);
+
+/* readlines: read input lines */
+int readlines(char *lineptr[], int maxlines) {
+    int len, nlines;
+    char *p, line[MAXLEN];
+
+    nlines = 0;
+    while ((len = getLine(line, MAXLEN)) > 0)
+        if (nlines >= maxlines || (p = alloc(len)) == NULL)
+            return -1;
+        else {
+            line[len - 1] = '\0'; /* delete newline */
+            strcpy(p, line);
+            lineptr[nlines++] = p;
+        }
+    return nlines;
+}
+
+void writelines(char *lineptr[], int nlines) {
+    while (nlines-- > 0)
+        printf("%s\n", *lineptr++);
+}
+
+int main(void) {
+    int maxlines = 100;
+    /* spit out what it read */
+    char *lineptr[maxlines];
+
+    int nlines = readlines(lineptr, maxlines);
+    writelines(lineptr, nlines);
+    return 0;
+}
+tes
+#+end_example
+
+As noted before, =readlines= routine did not deal with the case where the last
+line is not ended with newline character.
+
+Now let's turn around to our original topic, generalized =sort= program.
+
+#+BEGIN_SRC C :tangle C_codes/sort.c :main no
+#include <stdio.h>
+#include <string.h>
+
+#define MAXLINES 5000           /* max #lines to be sorted */
+char *lineptr[MAXLINES];        /* pointers to text lines */
+
+int readlines(char *lineptr[], int nlines);
+void writelines(char *lineptr[], int nlines);
+
+void qsort(void *lineptr[], int left, int right,
+           int (*comp)(void *, void *));
+int numcmp(char *, char *);
+
+/* sort input lines */
+int main(int argc, char *argv[]) {
+    int nlines;                 /* number of input lines read */
+    int numeric = 0;            /* 1 if numeric sort */
+
+    if (argc > 1 && strcmp(argv[1], "-n") == 0)
+        numeric = 0;
+    if ((nlines = readlines(lineptr, MAXLINES)) >= 0) {
+        qsort((void **) lineptr, 0, nlines - 1,
+              (int (*)(void *, void *)) (numeric ? numcmp : strcmp));
+        writelines(lineptr, nlines);
+        return 0;
+    } else {
+        printf("input too big to sort\n");
+        return 1;
+    }
+}
+#+END_SRC
+
+And the generalized quick sort subroutine:
+#+BEGIN_SRC C :tangle C_codes/qsort.c :main no
+
+/* qsort: sort v[left]...v[right] into increasing order */
+void qsort(void *v[], int left, int right,
+           int (*comp)(void *, void *)) {
+    int i, last;
+    void swap(void *v[], int, int);
+
+    if (left >= right)          /* do nothing if array contains */
+        return;                 /* fewer than two elements */
+    swap(v, left, (left + right) / 2);
+    last = left;
+    for (i = left+1; i <= right; i++)
+        if ((*comp)(v[i], v[left]) < 0)
+            swap(v, ++last, i);
+    swap(v, left, last);
+    qsort(v, left, last - 1, comp);
+    qsort(v, last + 1, right, comp);
+}
+
+#include <string.h>
+#include <stdio.h>
+#include <assert.h>
+
+void swap(void *v[], int i, int j) {
+    void *temp;
+
+    temp = v[i];
+    v[i] = v[j];
+    v[j] = temp;
+}
+
+/* test qsort */
+int main(void) {
+    char *test[] = {"9", "7", "8", "5", "2", "6", "3", "4", "1"};
+    int len = 9;
+    char temp[len];
+    qsort((void **) test, 0, len - 1, (int (*)(void *, void *)) strcmp); /* sort */
+    while (len-- > 0) {
+        sprintf(temp, "%d", len + 1);
+        assert(strcmp(temp ,test[len]) == 0); /* test[i] == i + 1 */
+    }
+}
+
+#+END_SRC
+
+#+RESULTS:
+* Test-Driven Development for Embedded C
+:PROPERTIES:
+:NOTER_DOCUMENT: ../MEGAsync/MIT Challenge/6.001/Test-Driven Development for Embedded C [Grenning 2011-05-05].pdf
+:END:
+** Getting Started
+*** Test-Driving Tools and Conventions
+**** Put the Knowledge to Work
+***** Setup development system
+I've done with Emacs. For the Unity, CppUTest, I've added those modules to
+current git project as submodules.
+***** Run the Unity Test
+Since the lastest version of Unity does not agree with the version used in this
+book, we need to decide what to use; as we are novice to this field let us
+follow the book's contents since that is what we are meant to learn.
+
+Fortunately, the source code in the website contains the Unity source file also
+with which the test configured, we can do execution without any further configurations.
+
+Let's run the test:
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code
+make -f MakefileUnity.mk
+#+END_SRC
+
+#+RESULTS:
+#+BEGIN_EXAMPLE
+compiling FakeTimeService.c
+unity/HomeAutomation/FakeTimeService.c:48:26: error: if statement has empty body [-Werror,-Wempty-body]
+    if (callback != NULL);
+                         ^
+unity/HomeAutomation/FakeTimeService.c:48:26: note: put the semicolon on a separate line to silence this warning
+1 error generated.
+make: *** [objs/unity/HomeAutomation/FakeTimeService.o] Error 1
+#+END_EXAMPLE
+
+Actually there was error in the book's code! The test code meant to eliminate
+all the bugs but it has in it. Well, since this is easy stuff, after fixing, let
+rerun the test:
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code
+make -f MakefileUnity.mk
+#+END_SRC
+
+#+RESULTS:
+: Running BookCode_Unity_tests
+: Unity test run 1 of 1
+: ..........!............................................................
+: -----------------------
+: 71 Tests 0 Failures 1 Ignored
+: OK
+***** Run the CppUTest Test
+The setting up the environment for CppUTest is way more easier than Unity since
+CppUTest is available in brew, we can just install it in shell:
+#+BEGIN_SRC sh
+brew install cpputest
+#+END_SRC
+
+And then let's do the works.
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code
+make -f MakefileCppUTest.mk
+#+END_SRC
+
+#+RESULTS:
+#+BEGIN_EXAMPLE
+mocks/FakeMicroTime.c:35:6: error: no previous prototype for function 'FakeMicroTime_Init' [-Werror,-Wmissing-prototypes]
+void FakeMicroTime_Init(uint32_t start, uint32_t incr)
+     ^
+mocks/FakeMicroTime.c:54:10: error: no previous prototype for function 'FakeMicroTime_GetDelayDuration' [-Werror,-Wmissing-prototypes]
+uint32_t FakeMicroTime_GetDelayDuration(void)
+         ^
+2 errors generated.
+make: *** [objs/mocks/FakeMicroTime.o] Error 1
+mocks/FakeMicroTime.c:35:6: error: no previous prototype for function 'FakeMicroTime_Init' [-Werror,-Wmissing-prototypes]
+void FakeMicroTime_Init(uint32_t start, uint32_t incr)
+     ^
+mocks/FakeMicroTime.c:54:10: error: no previous prototype for function 'FakeMicroTime_GetDelayDuration' [-Werror,-Wmissing-prototypes]
+uint32_t FakeMicroTime_GetDelayDuration(void)
+         ^
+2 errors generated.
+make: *** [objs/mocks/FakeMicroTime.o] Error 1
+#+END_EXAMPLE
+
+This is due to the =-Werror= flag, let's suppress this for now. Then it got:
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code
+make -f MakefileCppUTest.mk
+#+END_SRC
+
+#+RESULTS:
+: Running BookCode_CppUTest_tests
+: ..................................................
+: ..............................................!...
+: ...........................
+: OK (127 tests, 126 ran, 525 checks, 1 ignored, 0 filtered out, 3 ms)
+:
+***** Write more =sprintf()= tests
+Here we are going to add more tests. First, as suggested in the book, let us add
+the test for the "underrun"
+
+Here is the result.
+#+BEGIN_SRC C
+#if 1
+static char _output[100];
+static char *output = &_output[1];
+#endif
+
+
+...
+
+
+TEST_SETUP(sprintf)
+{
+#if 1
+    memset(_output, 0xaa, sizeof _output);
+#endif
+#if 0
+    memset(output, 0xaa, sizeof output);
+#endif
+    expected = "";
+}
+
+...
+
+static void given(int charsWritten)
+{
+    TEST_ASSERT_EQUAL(strlen(expected), charsWritten);
+    TEST_ASSERT_EQUAL_STRING(expected, output);
+    TEST_ASSERT_BYTES_EQUAL(0xaa, output[strlen(expected) + 1]);
+#if 1
+    TEST_ASSERT_BYTES_EQUAL(0xaa, _output[0]);
+#endif
+}
+#+END_SRC
+
+Let's check this new test!
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code
+make codeUnity
+#+END_SRC
+
+#+RESULTS:
+: make -i -f MakefileUnity.mk
+: compiling SprintfTest.c
+: Running BookCode_Unity_tests
+: Unity test run 1 of 1
+: ..........!............................................................
+: -----------------------
+: 71 Tests 0 Failures 1 Ignored
+: OK
+
+Now let's add new test case not the fixture:
+#+BEGIN_SRC C
+TEST(sprintf, InsertInteger)
+{
+    expect("20");
+    given(sprintf(output, "%d", 20));
+}
+#+END_SRC
+
+Then let's run!
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code
+make codeUnity
+#+END_SRC
+
+#+RESULTS:
+: make -i -f MakefileUnity.mk
+: compiling SprintfTest.c
+: Running BookCode_Unity_tests
+: Unity test run 1 of 1
+: ..........!............................................................
+: -----------------------
+: 71 Tests 0 Failures 1 Ignored
+: OK
+
+This time let's stud bug in it and see the change:
+#+BEGIN_SRC C
+TEST(sprintf, InsertInteger)
+{
+    expect("21");
+    given(sprintf(output, "%d", 20));
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code
+make codeUnity
+#+END_SRC
+
+#+RESULTS:
+: make -i -f MakefileUnity.mk
+: compiling SprintfTest.c
+: Running BookCode_Unity_tests
+: Unity test run 1 of 1
+: ..........!............................................................
+: -----------------------
+: 71 Tests 0 Failures 1 Ignored
+: OK
+
+Oops! Our bug didn't get revealed! This is since we didn't update
+=SprintfTestRunner.c= file appropriately. So we need to add the following line
+into =TEST_GROUP_RUNNER=:
+#+BEGIN_SRC C
+    RUN_TEST_CASE(sprintf, InsertInteger);
+#+END_SRC
+
+Then,
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code
+make codeUnity
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+Running BookCode_Unity_tests
+Unity test run 1 of 1
+..........!.........
+TEST(sprintf, InsertInteger)
+    unity/stdio/SprintfTest.c:68: FAIL:
+    Expected '21' Was '20'
+....................................................
+-----------------------
+72 Tests 1 Failures 1 Ignored
+FAIL
+#+end_example
+
+Now it spit out as expected with increased number of tests. Then fix the bug and
+rerun the test:
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code
+make codeUnity
+#+END_SRC
+
+#+RESULTS:
+: make -i -f MakefileUnity.mk
+: Running BookCode_Unity_tests
+: Unity test run 1 of 1
+: ..........!.............................................................
+: -----------------------
+: 72 Tests 0 Failures 1 Ignored
+: OK
+
+Lastly, let's test what test hidden in =SprintfTestRunner.c= file:
+#+BEGIN_SRC C
+    RUN_TEST_CASE(sprintf, StringWithSpace);
+#+END_SRC
+
+That is, =sprintf= should print the white spaces appropriately:
+#+BEGIN_SRC C
+TEST(sprintf, StringWithSpace)
+{
+    expect("Space should be	approriately printed");
+    given(sprintf(output, "Space%cshould be%capproriately printed", ' ', '\t'));
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code
+make codeUnity
+#+END_SRC
+
+#+RESULTS:
+: make -i -f MakefileUnity.mk
+: Running BookCode_Unity_tests
+: Unity test run 1 of 1
+: ..........!..............................................................
+: -----------------------
+: 73 Tests 0 Failures 1 Ignored
+: OK
+
+Now the CppUTest versions:
+#+BEGIN_SRC C
+#if 1
+    char _output[100];
+    char *output = &_output[1];
+#else
+    char output[100];
+#endif
+
+...
+
+#if 1
+        memset(_output, 0xaa, sizeof _output);
+#else
+        memset(output, 0xaa, sizeof output);
+#endif
+
+...
+
+        BYTES_EQUAL(0xaa, _output[0]);
+#+END_SRC
+
+Then test!
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code
+make codeCppUTest
+#+END_SRC
+
+#+RESULTS:
+: make -i -f MakefileCppUTest.mk
+: Running BookCode_CppUTest_tests
+: ..................................................
+: ................................................!.
+: .............................
+: OK (129 tests, 128 ran, 535 checks, 1 ignored, 0 filtered out, 2 ms)
+:
+
+Works as expected.
+***** Modify =TEST_GROUP(Sprintf)=
+That is, we need to modify the size of =output= dynamically. Fortunately we can
+extract the length of resulting =output= array via =expect=; so it implies we
+need to allocate the =output= in the =expect= function. Since the order of
+evaluation already fixed as calling =expect= and then =given=, we don't have to
+change that structure at all.
+
+All we need to do is delegate allocation from external definition and
+=TEST_SETUP= to =expect=.
+
+Here is the results:
+#+BEGIN_SRC C
+#if 1
+static char *_output;
+static char *output;
+#endif
+
+static void expect(const char * s)
+{
+    int newLen = strlen(s) + 3; /* null chracter + check overrun + check underrun */
+
+    expected = s;
+
+    /* dynamic allocation */
+    _output = calloc(newLen, sizeof(char));
+    memset(_output, 0xaa, newLen);
+    output = &_output[1];
+}
+#+END_SRC
+
+
+Then check
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code
+make codeUnity
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+Running BookCode_Unity_tests
+Unity test run 1 of 1
+..........!.......
+TEST(sprintf, NoFormatOperations)
+    unity/stdio/SprintfTest.c:159:FAIL: This test leaks!
+.
+TEST(sprintf, InsertString)
+    unity/stdio/SprintfTest.c:159:FAIL: This test leaks!
+.
+TEST(sprintf, InsertInteger)
+    unity/stdio/SprintfTest.c:159:FAIL: This test leaks!
+.
+TEST(sprintf, StringWithSpace)
+    unity/stdio/SprintfTest.c:159:FAIL: This test leaks!
+....................................................
+-----------------------
+73 Tests 0 Failures 1 Ignored
+OK
+#+end_example
+
+Oops! It complains about the memory leakage!
+
+We should =free= what we allocated dynamically:
+#+BEGIN_SRC C
+TEST_TEAR_DOWN(sprintf)
+{
+#if 1
+    free(_output);
+#endif
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code
+make codeUnity
+#+END_SRC
+
+#+RESULTS:
+: make -i -f MakefileUnity.mk
+: Running BookCode_Unity_tests
+: Unity test run 1 of 1
+: ..........!..............................................................
+: -----------------------
+: 73 Tests 0 Failures 1 Ignored
+: OK
+
+Now it works fine.
