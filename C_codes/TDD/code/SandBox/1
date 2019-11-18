@@ -1,0 +1,5 @@
+clang: error: no such file or directory: ':-I/usr/local/opt/gettext/include:-I/usr/local/opt/llvm/include:-I/usr/local/opt/zlib/include:-I/usr/local/opt/gettext/include:-I/usr/local/opt/llvm/include:-I/usr/local/opt/zlib/include'
+make[1]: [objs/./unity/LedDriver/LedDriverTest.o] Error 1 (ignored)
+clang: error: no such file or directory: 'objs/./unity/LedDriver/LedDriverTest.o'
+make[1]: [SandBox_Unity_tests] Error 1 (ignored)
+make[1]: [all] Error 1 (ignored)

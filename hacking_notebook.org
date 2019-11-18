@@ -8074,3 +8074,1157 @@ make codeUnity
 : OK
 
 Now it works fine.
+*** Starting a C Module
+**** Put the Knowledge to Work
+***** Start your own =LedDriver=
+The author of this book provides us the starting point of the project in
+=code/SandBox=. Unfortunately, there is no =README.txt= for us to follow; but as
+it is quite simple and straightforward code, we can look through the code to
+start.
+
+All we need to do is just follow what the text did in this section and
+experience with our own.
+
+Let us remind ourselves the specifications we need to implement:
+- All LEDs are off after the driver is initialized.
+- A single LED can be turned on.
+- A single LED can be turned off.
+- Multiple LEDs can be turned on/off.
+- Turn on all LEDs.
+- Turn off all LEDs.
+- Query LED state.
+- Check boundary values.
+- Check out-of-bounds values.
+
+
+Actually those is already processed one: At the very first, we need to deduce
+the above specifications from more abstract, ambiguous one; but for this
+specific case, these are trivial ones. So let us focus the implementation of
+tests for now. We will have to consider the design issues later for more complex
+real world application.
+
+First, let's write starting point.
+#+BEGIN_SRC C
+TEST(LedDriver, StartHere)
+{
+   TEST_FAIL_MESSAGE("Start here");
+}
+#+END_SRC
+
+Then try the test:
+#+BEGIN_SRC sh :results verbatim :exports both
+cd C_codes/TDD/code/SandBox
+make codeUnity
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+.
+TEST(LedDriver, StartHere)
+    unity/LedDriver/LedDriverTest.c:44:FAIL: Start here
+
+-----------------------
+1 Tests 1 Failures 0 Ignored
+FAIL
+#+end_example
+
+Now we can start from there!
+
+As did in the book, let's start from the =LedsOffAfterCreate= first.
+
+See whether it is updated:
+#+BEGIN_SRC sh :results verbatim :exports both
+cd C_codes/TDD/code/SandBox
+make codeUnity
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+.
+TEST(LedDriver, LedsOffAfterCreate)
+    unity/LedDriver/LedDriverTest.c:44:FAIL: Start here
+
+-----------------------
+1 Tests 1 Failures 0 Ignored
+FAIL
+#+end_example
+
+Now let's fake out it:
+#+BEGIN_SRC C
+TEST(LedDriver, LedsOffAfterCreate)
+{
+    uint16_t virtualLeds = 0xffff; /* the LEDs on by connection */
+    LedDriver_Create(&virtualLeds);
+    TEST_ASSERT_EQUAL_HEX16(0, virtualLeds);
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :results verbatim :exports both
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling LedDriverTest.c
+unity/LedDriver/LedDriverTest.c:46:22: error: too many arguments to function call, expected 0, have 1
+    LedDriver_Create(&virtualLeds);
+    ~~~~~~~~~~~~~~~~ ^~~~~~~~~~~~
+./include/LedDriver/LedDriver.h:30:1: note: 'LedDriver_Create' declared here
+void LedDriver_Create(void);
+^
+1 error generated.
+make[1]: [objs/./unity/LedDriver/LedDriverTest.o] Error 1 (ignored)
+Linking SandBox_Unity_tests
+clang: error: no such file or directory: 'objs/./unity/LedDriver/LedDriverTest.o'
+make[1]: [SandBox_Unity_tests] Error 1 (ignored)
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+.
+TEST(LedDriver, LedsOffAfterCreate)
+    unity/LedDriver/LedDriverTest.c:44:FAIL: Start here
+
+-----------------------
+1 Tests 1 Failures 0 Ignored
+FAIL
+make[1]: [all] Error 1 (ignored)
+#+end_example
+
+Cool! we have progressed since it detect our implementation is not sufficient.
+Let's complement that. First, let's modify the prototype of the function with error.
+#+BEGIN_SRC C
+void LedDriver_Create(uint16_t *);
+...
+void LedDriver_Create(uint16_t *address)
+{
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :results verbatim :exports both
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+.
+TEST(LedDriver, LedsOffAfterCreate)
+    unity/LedDriver/LedDriverTest.c:46: FAIL:
+    Expected 0x0000 Was 0xFFFF
+
+-----------------------
+1 Tests 1 Failures 0 Ignored
+FAIL
+make[1]: [all] Error 1 (ignored)
+#+end_example
+
+Now it's time to implement the source code:
+#+BEGIN_SRC C
+void LedDriver_Create(uint16_t *address)
+{
+    *address = 0;
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :results verbatim :exports both
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+: make -i -f MakefileUnity.mk
+: Running SandBox_Unity_tests
+: Unity test run 1 of 1
+: .
+: -----------------------
+: 1 Tests 0 Failures 0 Ignored
+: OK
+
+I myself have the impression that TDD is bottom up approach whereas BDD top down
+approach, which is the same approach in the different angle from wishful
+thinking that we leared from SICP.
+
+But in the text book, it says
+#+BEGIN_QUOTE
+The first few tests drive the interface design. The focus on the interface means
+that we're working form the outside of the code being developed to the inside.
+#+END_QUOTE
+
+Which implies, TDD is based on the top down approach rather than bottom up
+fashion. Actually we can think of the BDD as extension of TDD in a more top down
+manner.
+
+So let's start with the boundary conditions to fixate the interface from outside
+of it; that is, we going to implement the second specification among the list.
+
+#+BEGIN_SRC C
+TEST(LedDriver, TurnOnLedOne)
+{
+    uint16_t virtualLeds;       /* get the address of LEDs */
+    LedDriver_Create(&virtualLeds); /* initialize the LEDs */
+    LedDriver_TurnOn(1);            /* turn on #1 of LEDs */
+    TEST_ASSERT_EQUAL_HEX16(1, virtualLeds);
+}
+#+END_SRC
+
+Then setup and run the test:
+#+BEGIN_SRC sh :results verbatim :exports both
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling LedDriverTest.c
+unity/LedDriver/LedDriverTest.c:53:5: error: implicit declaration of function 'LedDriver_TurnOn' is invalid in C99 [-Werror,-Wimplicit-function-declaration]
+    LedDriver_TurnOn(1);            /* turn on #1 of LEDs */
+    ^
+1 error generated.
+make[1]: [objs/./unity/LedDriver/LedDriverTest.o] Error 1 (ignored)
+Linking SandBox_Unity_tests
+clang: error: no such file or directory: 'objs/./unity/LedDriver/LedDriverTest.o'
+make[1]: [SandBox_Unity_tests] Error 1 (ignored)
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+.
+-----------------------
+1 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+It complains that we have not provided the protype of function. Let's provide
+minimal code to pass that error:
+#+BEGIN_SRC C
+void LedDriver_TurnOn(int);
+
+...
+
+void LedDriver_TurnOn(int ledNumber)
+{
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :results verbatim :exports both
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling LedDriver.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+..
+TEST(LedDriver, TurnOnLedOne)
+    unity/LedDriver/LedDriverTest.c:54: FAIL:
+    Expected 0x0001 Was 0x0000
+
+-----------------------
+2 Tests 1 Failures 0 Ignored
+FAIL
+make[1]: [all] Error 1 (ignored)
+#+end_example
+
+Now it detects the bug appropriately. Let's add minimal source code to pass the
+test. To do that, we need to add private variable that would be used in
+=LedDriver_...= ADT; that is, our =TurnOn= function needs the address of LEDs to
+turn on and that is passed to =Create=. It implies we need to make =address= as
+static external variable that would be shared in the =LedDriver= source file:
+#+BEGIN_SRC C
+static uint16_t *ledsAddress;
+
+void LedDriver_Create(uint16_t *address)
+{
+    ledsAddress = address;
+    *ledsAddress = 0;
+}
+#+END_SRC
+
+And the hard-coding:
+#+BEGIN_SRC C
+void LedDriver_TurnOn(int ledNumber)
+{
+    *ledsAddress = 1;
+}
+#+END_SRC
+
+Let's check:
+
+#+BEGIN_SRC sh :results verbatim :exports both
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling LedDriver.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+..
+-----------------------
+2 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+Next, we are going to implement the third requirement; yes we ain't done with
+the previous ones but, as we noted before, we are going to make interface
+concrete with /code vice/:
+#+BEGIN_SRC C
+TEST(LedDriver, TurnOffLedOne)
+{
+    uint16_t virtualLeds;
+    LedDriver_Create(&virtualLeds);
+    LedDriver_TurnOn(1);
+    LedDriver_TurnOff(1);
+    TEST_ASSERT_EQUAL_HEX16(0, virtualLeds);
+}
+#+END_SRC
+
+And, as usual, provide minimal code to make the compiler happy:
+#+BEGIN_SRC sh :results verbatim :exports both
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling LedDriverTest.c
+compiling LedDriverTestRunner.c
+compiling LedDriver.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+...
+TEST(LedDriver, TurnOffLedOne)
+    unity/LedDriver/LedDriverTest.c:63: FAIL:
+    Expected 0x0000 Was 0x0001
+
+-----------------------
+3 Tests 1 Failures 0 Ignored
+FAIL
+make[1]: [all] Error 1 (ignored)
+#+end_example
+
+This time we are going to hard-code again:
+#+BEGIN_SRC C
+void LedDriver_TurnOff(int ledNumber)
+{
+    *ledsAddress = 0;
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :results verbatim :exports both
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling LedDriver.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+...
+-----------------------
+3 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+As all the tests written passed, it's time to refactor /on green/; you would be
+uncomfortable with the duplicate code: Initialization of LEDs address and link
+that with =LedDriver=.
+
+#+BEGIN_SRC C
+TEST_GROUP(LedDriver);
+
+static uint16_t virtualLeds;
+
+TEST_SETUP(LedDriver)
+{
+    LedDriver_Create(&virtualLeds);
+}
+#+END_SRC
+
+
+Then re-run the test to check all the previous behavior works as expected:
+#+BEGIN_SRC sh :results verbatim :exports both
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling LedDriverTest.c
+unity/LedDriver/LedDriverTest.c:47:14: error: declaration shadows a variable in the global scope [-Werror,-Wshadow]
+    uint16_t virtualLeds = 0xffff; /* the LEDs on by connection */
+             ^
+unity/LedDriver/LedDriverTest.c:34:17: note: previous declaration is here
+static uint16_t virtualLeds;
+                ^
+1 error generated.
+make[1]: [objs/./unity/LedDriver/LedDriverTest.o] Error 1 (ignored)
+Linking SandBox_Unity_tests
+clang: error: no such file or directory: 'objs/./unity/LedDriver/LedDriverTest.o'
+make[1]: [SandBox_Unity_tests] Error 1 (ignored)
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+...
+-----------------------
+3 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+Actually we need to change the statement of definition of =virtualLeds= in the
+=LedsOffAfterCreate= test case to assignment:
+#+BEGIN_SRC C
+TEST(LedDriver, LedsOffAfterCreate)
+{
+    virtualLeds = 0xffff; /* the LEDs on by connection */
+    LedDriver_Create(&virtualLeds);
+    TEST_ASSERT_EQUAL_HEX16(0, virtualLeds);
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :results verbatim :exports both
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+: make -i -f MakefileUnity.mk
+: compiling LedDriverTest.c
+: Linking SandBox_Unity_tests
+: Running SandBox_Unity_tests
+: Unity test run 1 of 1
+: ...
+: -----------------------
+: 3 Tests 0 Failures 0 Ignored
+: OK
+
+Now we have caught the pace of book.
+***** Write a test list for a first-in first-our =CircularBuffer=
+Here we consider what we delegated or assumed in the preceding exercise: Deduce
+the specification from more abstract and ambiguous one.
+
+This data structure is queue. There are several ambiguities lurking around:
+- Should the queue initialized based on the user handed value? E.g. the size of
+  buffer?
+- Should we extend the size of the queue if it is overflowed with the elements?
+
+
+These ambiguity is due to the static property of C language. The main feature of
+requested one is first-in first-out property; we should rephrase this feature in
+the more specific words. The base case can be expressed as
+- With fresh =CircularBuffer=, if one input an integer value to that, one should
+  get the same value by popping.
+
+
+More generally,
+- If there were made /n/ number of pushing as whole, and if /m/ is less than or
+  equals to /n/, /m/ th popping should retrieve the integer pushed /m/ th
+  counting from the first pushing.
+
+
+We need to resolve the abstruse specification with concrete test cases.
+
+For testing, we need to resolve the ambiguities posed above. It is totally
+arbitrary for this situation since there is no other constraint; or we can take
+these ambiguities as implementation details we can exploit.
+
+So here we are going to specify those in the perspective of easiness of
+implementation:
+- =CircularBuffer= is initialized with size user supplied.
+- One can put an integer value into =CircularBuffer=.
+- One can retrieve an integer value from =CircularBuffer= if the number of push
+  is greater than or equals to the number of pop, including currently made one.
+- The value got by popping that was made /m/ th only counting the pops from the
+  first pop should be the one pushed at /m/ th only counting the pushes.
+
+
+The last one specifies the contraction between the pop and push.
+
+****** Revision the Test list
+Actually, with above specifications we can not decide how to implement our tests
+in concrete sense and I've learned not to think what I don't need to think for
+now in SICP. But we can not stick with that, at least for now, since TDD
+progress in slightly different direction.
+
+The answer the author thinks as correct is posted on [[http://blog.wingman-sw.com/tdd-guided-by-zombies][his blog]]; we should rethink
+the specifications in different perspective since we are going to implement
+concretely.
+
+From his blog, I've realized that I've misunderstood the TDD a lot although I'm
+really newbie to TDD world. I myself assumed implicitly that TDD would align
+with the wishful thinking and it would design with that idea behind.
+
+With that mind, as I acquaint with the wishful thinking, I've listed above
+specifications in contraction manner the submodules should satisfy. But this
+list is the result of designing the main module.
+
+So in wishful thinking, we first experiment with the given problem to deduce or
+design the specifications. By this reasoning, I've said that list the
+specifications is not the starting point in principle.
+
+I've expected that my reasoning does not hold; but it seems like hold but in the
+totally opposite direction: Test list is not the specifications. We need to
+design the topmost abstraction layer; and then we can start to figure out tests
+we need to implement.
+
+As evidence for this observation, the author states the presumed operations --
+=Get()=, =Put()=, =Create()=, =IsEmpty()=, =IsFull()= -- plainly; these
+operations is the result of wishful thinking. In higher level language like
+Scheme (or Lisp) and Java, Python, Haskell, ML, and so on the remaining task is
+mostly trivial ones and straightforward concepts.
+
+But in C, it is not so trivial to implement the rest pieces since we have to
+count the memory leakage and all the other runtime errors like overrun or
+underrun and so on.
+
+As a solution or method, one rules out the methods to tackle with these
+problems; or to implement the rest correctly, one would use the TDD method.
+Mostly, one use BDD approach to exploit the wishful thinking paradigm.
+
+TDD is more implementation strategy than paradigm since one should have done
+with the topmost abstraction design. For the test phase, one should got concrete
+idea how one going to implement given task.
+
+First we define the behaviors we want from our resulting product. This is
+actually the ones we listed above saying as "this is the test list."
+
+Now we should think how we are going to implement the task. Since we are
+programming in C, it is natural to use the memory structure, array, as backbone
+of our data structure. Even if with this backbone we can support the dynamically
+evolving =CircularBuffer=; but as we said before this is implementation details,
+for simplicity we will use the static size of backbone. Then we can list out the
+tests:
+- Empty case
+- Full case
+- Overflow case
+- Underflow case
+- Wrap around case
+
+
+These are also the cases we should handle in the implementation. We can deduce
+those by experimenting with the data structure model we are going to make
+concrete. Since above list also somewhat abstract, let's open up the tests that
+we are going to implement in this section:
+- Empty test ::
+  - The buffer should be empty right after the creation.
+  - The buffer should not be empty right after =push=.
+- Full test ::
+  - The buffer should not be full right after the creation.
+- =Push= and =Pop= test ::
+  - The buffer should be empty if one push value into the fresh buffer and
+    rightafter pop that.
+  - If one start with fresh buffer, push one value and pop from that buffer, the
+    popped value should be same as the pushed one.
+
+***** Start test-driving the =CircularBuffer=
+Here we are going to implement the TDD only the amount that is done in this
+section.
+
+The first step is writing failling test:
+#+BEGIN_SRC C
+TEST(CircularBuffer, EmptyAfterCreation)
+{
+    TEST_FAIL_MESSAGE("Start from here");
+}
+#+END_SRC
+
+And wire up all the other files. And then we got:
+
+#+BEGIN_SRC sh :results verbatim :exports both
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling CircularBufferTest.c
+compiling CircularBufferTestRunner.c
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+....
+TEST(CircularBuffer, EmptyAfterCreation)
+    unity/CircularBuffer/CircularBufferTest.c:15:FAIL: Start from here
+
+-----------------------
+4 Tests 1 Failures 0 Ignored
+FAIL
+make[1]: [all] Error 1 (ignored)
+#+end_example
+
+Then let's implement the test code as
+#+BEGIN_SRC C
+TEST(CircularBuffer, EmptyAfterCreation)
+{
+    CircularBuffer *buf = CircularBuffer_Create();
+    TEST_ASSERT_TRUE(IsEmpty(buf));
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :results verbatim :exports both
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling CircularBufferTest.c
+unity/CircularBuffer/CircularBufferTest.c:15:5: error: use of undeclared identifier 'CircularBuffer'
+    CircularBuffer *buf = CircularBuffer_Create();
+    ^
+unity/CircularBuffer/CircularBufferTest.c:15:21: error: use of undeclared identifier 'buf'
+    CircularBuffer *buf = CircularBuffer_Create();
+                    ^
+unity/CircularBuffer/CircularBufferTest.c:15:27: error: implicit declaration of function 'CircularBuffer_Create' is invalid in C99 [-Werror,-Wimplicit-function-declaration]
+    CircularBuffer *buf = CircularBuffer_Create();
+                          ^
+unity/CircularBuffer/CircularBufferTest.c:16:22: error: implicit declaration of function 'IsEmpty' is invalid in C99 [-Werror,-Wimplicit-function-declaration]
+    TEST_ASSERT_TRUE(IsEmpty(buf));
+                     ^
+unity/CircularBuffer/CircularBufferTest.c:16:30: error: use of undeclared identifier 'buf'
+    TEST_ASSERT_TRUE(IsEmpty(buf));
+                             ^
+5 errors generated.
+make[1]: [objs/./unity/CircularBuffer/CircularBufferTest.o] Error 1 (ignored)
+compiling CircularBuffer.c
+src/CircularBuffer/CircularBuffer.c:1:10: fatal error: 'CircularBuffer.h' file not found
+#include "CircularBuffer.h"
+         ^~~~~~~~~~~~~~~~~~
+1 error generated.
+make[1]: [objs/./src/CircularBuffer/CircularBuffer.o] Error 1 (ignored)
+Building archive lib/libSandBox_Unity.a
+ar: objs/./src/CircularBuffer/CircularBuffer.o: No such file or directory
+r - objs/./src/LedDriver/LedDriver.o
+a - objs/./src/CircularBuffer/CircularBuffer.o
+make[1]: [lib/libSandBox_Unity.a] Error 1 (ignored)
+Linking SandBox_Unity_tests
+clang: error: no such file or directory: 'objs/./unity/CircularBuffer/CircularBufferTest.o'
+make[1]: [SandBox_Unity_tests] Error 1 (ignored)
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+....
+TEST(CircularBuffer, EmptyAfterCreation)
+    unity/CircularBuffer/CircularBufferTest.c:15:FAIL: Start from here
+
+-----------------------
+4 Tests 1 Failures 0 Ignored
+FAIL
+make[1]: [all] Error 1 (ignored)
+#+end_example
+
+Yes it complains about undefined types. It's time to add those.
+
+=CircularBuffer.h=
+#+BEGIN_SRC C
+#ifndef CIRCULAR_BUFFER
+#define CIRCULAR_BUFFER
+#include <stdbool.h>
+typedef struct CircularBufferStructure CircularBuffer;
+CircularBuffer *CircularBuffer_Create(void);
+bool IsEmpty(*CircularBuffer);
+
+#endif // CIRCULAR_BUFFER
+#+END_SRC
+
+Then now
+#+BEGIN_SRC sh :results verbatim :exports both
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling CircularBufferTest.c
+Linking SandBox_Unity_tests
+Undefined symbols for architecture x86_64:
+  "_CircularBuffer_Create", referenced from:
+      _TEST_CircularBuffer_EmptyAfterCreation_ in CircularBufferTest.o
+  "_IsEmpty", referenced from:
+      _TEST_CircularBuffer_EmptyAfterCreation_ in CircularBufferTest.o
+ld: symbol(s) not found for architecture x86_64
+clang: error: linker command failed with exit code 1 (use -v to see invocation)
+make[1]: [SandBox_Unity_tests] Error 1 (ignored)
+Running SandBox_Unity_tests
+/bin/sh: ./SandBox_Unity_tests: No such file or directory
+make[1]: [all] Error 127 (ignored)
+#+end_example
+
+Now we need to implement those undefined functions to pass the tests:
+#+BEGIN_SRC C
+CircularBuffer *CircularBuffer_Create(void)
+{
+}
+
+bool IsEmpty(CircularBuffer *buf)
+{
+    true;
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :results verbatim :exports both
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling CircularBuffer.c
+src/CircularBuffer/CircularBuffer.c:5:1: error: control reaches end of non-void function [-Werror,-Wreturn-type]
+}
+^
+src/CircularBuffer/CircularBuffer.c:10:1: error: control reaches end of non-void function [-Werror,-Wreturn-type]
+}
+^
+2 errors generated.
+make[1]: [objs/./src/CircularBuffer/CircularBuffer.o] Error 1 (ignored)
+Building archive lib/libSandBox_Unity.a
+ar: objs/./src/CircularBuffer/CircularBuffer.o: No such file or directory
+r - objs/./src/LedDriver/LedDriver.o
+make[1]: [lib/libSandBox_Unity.a] Error 1 (ignored)
+/Library/Developer/CommandLineTools/usr/bin/ranlib: file: lib/libSandBox_Unity.a(CircularBuffer.o) has no symbols
+Linking SandBox_Unity_tests
+Undefined symbols for architecture x86_64:
+  "_CircularBuffer_Create", referenced from:
+      _TEST_CircularBuffer_EmptyAfterCreation_ in CircularBufferTest.o
+  "_IsEmpty", referenced from:
+      _TEST_CircularBuffer_EmptyAfterCreation_ in CircularBufferTest.o
+ld: symbol(s) not found for architecture x86_64
+clang: error: linker command failed with exit code 1 (use -v to see invocation)
+make[1]: [SandBox_Unity_tests] Error 1 (ignored)
+Running SandBox_Unity_tests
+/bin/sh: ./SandBox_Unity_tests: No such file or directory
+make[1]: [all] Error 127 (ignored)
+#+end_example
+
+So we have to construct the forward declared =CircularBuffer= to make the
+compiler happy:
+#+BEGIN_SRC C
+struct CircularBufferStructure {
+    int going_to_be_implemented;
+};
+
+CircularBuffer *CircularBuffer_Create(void)
+{
+    CircularBuffer *temp = NULL;
+    return temp;
+}
+
+bool IsEmpty(CircularBuffer *buf)
+{
+    return true;
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :results verbatim :exports both
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling CircularBufferTest.c
+compiling CircularBuffer.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+r - objs/./src/CircularBuffer/CircularBuffer.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+....
+-----------------------
+4 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+Now we turn to the next clause -- =IsFull=:
+#+BEGIN_SRC C
+TEST(CircularBuffer, NotFullAfterCreation)
+{
+    CircularBuffer *buf = CircularBuffer_Create();
+    TEST_ASSERT_FALSE(IsFull(buf));
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :results verbatim :exports both
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling CircularBufferTest.c
+unity/CircularBuffer/CircularBufferTest.c:23:23: error: implicit declaration of function 'IsFull' is invalid in C99 [-Werror,-Wimplicit-function-declaration]
+    TEST_ASSERT_FALSE(IsFull(buf));
+                      ^
+1 error generated.
+make[1]: [objs/./unity/CircularBuffer/CircularBufferTest.o] Error 1 (ignored)
+Linking SandBox_Unity_tests
+clang: error: no such file or directory: 'objs/./unity/CircularBuffer/CircularBufferTest.o'
+make[1]: [SandBox_Unity_tests] Error 1 (ignored)
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+....
+-----------------------
+4 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+As the test needs the code, let's provide it:
+#+BEGIN_SRC C
+bool IsFull(CircularBuffer *);
+
+bool IsFull(CircularBuffer *buf)
+{
+    return true;
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :results verbatim :exports both
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling CircularBufferTest.c
+compiling CircularBuffer.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+r - objs/./src/CircularBuffer/CircularBuffer.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+.....
+TEST(CircularBuffer, NotFullAfterCreation)
+    unity/CircularBuffer/CircularBufferTest.c:23:FAIL: Expected FALSE Was TRUE
+
+-----------------------
+5 Tests 1 Failures 0 Ignored
+FAIL
+make[1]: [all] Error 1 (ignored)
+#+end_example
+
+Now it's time to hard-code:
+#+BEGIN_SRC C
+bool IsFull(CircularBuffer *buf)
+{
+    return false;
+}
+#+END_SRC
+
+Then,
+#+BEGIN_SRC sh :results verbatim :exports both
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling CircularBuffer.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+r - objs/./src/CircularBuffer/CircularBuffer.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+.....
+-----------------------
+5 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+Now it's time to refactor the test code since we have encountered with
+duplication:
+#+BEGIN_SRC C
+TEST_GROUP(CircularBuffer);
+
+static CircularBuffer *buf;
+
+TEST_SETUP(CircularBuffer)
+{
+    buf = CircularBuffer_Create();
+}
+
+TEST_TEAR_DOWN(CircularBuffer)
+{
+    CircularBuffer_Destroy(buf);
+}
+
+TEST(CircularBuffer, EmptyAfterCreation)
+{
+    TEST_ASSERT_TRUE(IsEmpty(buf));
+}
+
+TEST(CircularBuffer, NotFullAfterCreation)
+{
+    TEST_ASSERT_FALSE(IsFull(buf));
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :results verbatim :exports both
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+: make -i -f MakefileUnity.mk
+: compiling CircularBufferTest.c
+: Linking SandBox_Unity_tests
+: Running SandBox_Unity_tests
+: Unity test run 1 of 1
+: .....
+: -----------------------
+: 5 Tests 0 Failures 0 Ignored
+: OK
+
+Now let's rename the =CircularBuffer= as pointer:
+#+BEGIN_SRC C
+typedef struct CircularBufferStructure *CircularBuffer;
+#+END_SRC
+
+Since this is really the type buffer variable would have. With the subsequent
+change, let's check whether it works as it is:
+#+BEGIN_SRC sh :results verbatim :exports both
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling CircularBufferTest.c
+compiling CircularBuffer.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+r - objs/./src/CircularBuffer/CircularBuffer.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+.....
+-----------------------
+5 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+We could stop the coding for this section at this point, but actually we can
+pass more tests as outlined in preceding test list:
+#+BEGIN_SRC C
+TEST(CircularBuffer, NotEmptyAfterPush)
+{
+    CircularBuffer_Push(48);
+    TEST_ASSERT_FALSE(CircularBuffer_IsEmpty(buf));
+}
+#+END_SRC
+
+Then the minimum code:
+#+BEGIN_SRC C
+/* Mutators */
+void CircularBuffer_Push(int val)
+{
+}
+#+END_SRC
+
+Then the compiler spits:
+#+BEGIN_SRC sh :results verbatim :exports both
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling CircularBufferTest.c
+compiling CircularBufferTestRunner.c
+compiling CircularBuffer.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+r - objs/./src/CircularBuffer/CircularBuffer.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+......
+TEST(CircularBuffer, NotEmptyAfterPush)
+    unity/CircularBuffer/CircularBufferTest.c:31:FAIL: Expected FALSE Was TRUE
+
+-----------------------
+6 Tests 1 Failures 0 Ignored
+FAIL
+make[1]: [all] Error 1 (ignored)
+#+end_example
+
+No longer fake out with =NULL= pointer; here we need another fake, =flag=:
+#+BEGIN_SRC C
+enum {EMPTY = 1, FULL = 2};
+/* Implementation of type */
+struct CircularBufferStructure {
+    int going_to_be_implemented;
+    int flag;
+};
+
+/* Constructor */
+CircularBuffer CircularBuffer_Create(void)
+{
+    CircularBuffer buf = malloc(sizeof(struct CircularBufferStructure));
+    buf->flag = EMPTY;
+    return buf;
+}
+
+/* Destructor */
+void CircularBuffer_Destroy(CircularBuffer buf)
+{
+    free(buf);
+}
+
+/* Predicates */
+bool CircularBuffer_IsEmpty(CircularBuffer buf)
+{
+    return buf->flag & EMPTY;
+}
+
+bool CircularBuffer_IsFull(CircularBuffer buf)
+{
+    return buf->flag & FULL;
+}
+
+/* Mutators */
+void CircularBuffer_Push(int val, CircularBuffer buf)
+{
+    buf->flag = 0;
+}
+#+END_SRC
+
+Then let's check the test:
+#+BEGIN_SRC sh :results verbatim :exports both
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling CircularBuffer.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+r - objs/./src/CircularBuffer/CircularBuffer.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+......
+-----------------------
+6 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+Then now retrieve test:
+#+BEGIN_SRC C
+TEST(CircularBuffer, OnePopShouldSameAsOnePushed)
+{
+    int pushed = 48;
+    CircularBuffer_Push(pushed, buf);
+    TEST_ASSERT_EQUAL(pushed, (CircularBuffer_Pop(buf)));
+}
+#+END_SRC
+
+Then let's make compiler happy:
+#+BEGIN_SRC C
+int CircularBuffer_Pop(CircularBuffer buf)
+{
+    return 0;
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :results verbatim :exports both
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling CircularBufferTest.c
+compiling CircularBufferTestRunner.c
+compiling CircularBuffer.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+r - objs/./src/CircularBuffer/CircularBuffer.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+.......
+TEST(CircularBuffer, OnePopShouldSameAsOnePushed)
+    unity/CircularBuffer/CircularBufferTest.c:38: FAIL:
+    Expected 48 Was 0
+
+-----------------------
+7 Tests 1 Failures 0 Ignored
+FAIL
+make[1]: [all] Error 1 (ignored)
+#+end_example
+
+And here is the hard coding:
+#+BEGIN_SRC C
+int CircularBuffer_Pop(CircularBuffer buf)
+{
+    return 48;
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :results verbatim :exports both
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling CircularBuffer.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+r - objs/./src/CircularBuffer/CircularBuffer.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+.......
+-----------------------
+7 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+Good to go.
