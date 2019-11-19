@@ -9228,3 +9228,769 @@ OK
 #+end_example
 
 Good to go.
+*** Testing Your Way to Done
+Let us follows the books contents of this section within the =Sandbox= folder.
+
+First add the next test case that would lead to get rid of all the fake codes:
+#+BEGIN_SRC C
+TEST(LedDriver, TurnOnMultiplesLeds)
+{
+    LedDriver_TurnOn(9);
+    LedDriver_TurnOn(8);
+    TEST_ASSERT_EQUAL_HEX16(0x180, virtualLeds);
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+....
+TEST(LedDriver, TurnOnMultiplesLeds)
+    unity/LedDriver/LedDriverTest.c:67: FAIL:
+    Expected 0x0180 Was 0x0001
+....
+-----------------------
+8 Tests 1 Failures 0 Ignored
+FAIL
+#+end_example
+
+Then code:
+#+BEGIN_SRC C
+void LedDriver_TurnOn(int ledNumber)
+{
+    *ledsAddress |= 1 << (ledNumber - 1);
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling LedDriver.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+r - objs/./src/CircularBuffer/CircularBuffer.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+........
+-----------------------
+8 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+And refactor on green:
+#+BEGIN_SRC C
+static uint16_t convertedLedNumberToBit(int ledNumber)
+{
+    return 1 << (ledNumber - 1);
+}
+
+void LedDriver_TurnOn(int ledNumber)
+{
+    *ledsAddress |= convertedLedNumberToBit(ledNumber);
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling LedDriver.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+r - objs/./src/CircularBuffer/CircularBuffer.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+........
+-----------------------
+8 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+And move to next -- get rid of the next fake code:
+#+BEGIN_SRC C
+TEST(LedDriver, TurnOffAnyLed)
+{
+    LedDriver_TurnOn(9);
+    LedDriver_TurnOn(8);
+    LedDriver_TurnOff(8);
+    TEST_ASSERT_EQUAL_HEX16(0x100, virtualLeds);
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling LedDriverTest.c
+compiling LedDriverTestRunner.c
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+.....
+TEST(LedDriver, TurnOffAnyLed)
+    unity/LedDriver/LedDriverTest.c:75: FAIL:
+    Expected 0x0100 Was 0x0000
+....
+-----------------------
+9 Tests 1 Failures 0 Ignored
+FAIL
+#+end_example
+
+Before doing that, we would be better to test the other case first to flow
+naturally:
+#+BEGIN_SRC C
+TEST(LedDriver, AllOn)
+{
+    LedDriver_TurnAllOn();
+    TEST_ASSERT_EQUAL_HEX16(0xffff, virtualLeds);
+}
+#+END_SRC
+
+And implementation:
+#+BEGIN_SRC C
+void LedDriver_TurnAllOn(void)
+{
+    *ledsAddress = 0xffff;
+}
+#+END_SRC
+
+We've commented out the previous failing test:
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+: make -i -f MakefileUnity.mk
+: compiling LedDriverTestRunner.c
+: Linking SandBox_Unity_tests
+: Running SandBox_Unity_tests
+: Unity test run 1 of 1
+: .........
+: -----------------------
+: 9 Tests 0 Failures 0 Ignored
+: OK
+
+And now refactor on green:
+#+BEGIN_SRC C
+enum {ALL_LEDS_ON = ~0, ALL_LEDS_OFF = ~ALL_LEDS_ON};
+
+void LedDriver_TurnAllOn(void)
+{
+    ,*ledsAddress = ALL_LEDS_ON;
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling LedDriverTest.c
+compiling LedDriver.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+r - objs/./src/CircularBuffer/CircularBuffer.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+.........
+-----------------------
+9 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+Then the previous test got
+#+BEGIN_SRC C
+TEST(LedDriver, TurnOffAnyLed)
+{
+    LedDriver_TurnAllOn();
+    LedDriver_TurnOff(8);
+    TEST_ASSERT_EQUAL_HEX16(0xff7f, virtualLeds);
+}
+#+END_SRC
+
+Then implementation:
+#+BEGIN_SRC C
+void LedDriver_TurnOff(int ledNumber)
+{
+    *ledsAddress &= ~(convertedLedNumberToBit(ledNumber));
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling LedDriverTest.c
+compiling LedDriver.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+r - objs/./src/CircularBuffer/CircularBuffer.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+..........
+-----------------------
+10 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+Now let's turn to the hardware's limitation:
+#+BEGIN_SRC C
+TEST(LedDriver, LedMemoryIsNotReadable)
+{
+    virtualLeds = 0xffff;
+    LedDriver_TurnOn(8);
+    TEST_ASSERT_EQUAL_HEX16(0x80, virtualLeds);
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling LedDriverTest.c
+compiling LedDriverTestRunner.c
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+.......
+TEST(LedDriver, LedMemoryIsNotReadable)
+    unity/LedDriver/LedDriverTest.c:87: FAIL:
+    Expected 0x0080 Was 0xFFFF
+....
+-----------------------
+11 Tests 1 Failures 0 Ignored
+FAIL
+make[1]: [all] Error 1 (ignored)
+#+end_example
+
+We can fix this by preserving the LEDs state:
+#+BEGIN_SRC C
+static uint16_t *ledsAddress;
+static uint16_t ledsImage;
+
+void LedDriver_Create(uint16_t *address)
+{
+    ledsAddress = address;
+    ledsImage = ALL_LEDS_OFF;
+    ,*ledsAddress = ledsImage;
+}
+
+void LedDriver_TurnOn(int ledNumber)
+{
+    ledsImage|= convertedLedNumberToBit(ledNumber);
+    ,*ledsAddress = ledsImage;
+}
+
+void LedDriver_TurnOff(int ledNumber)
+{
+    ledsImage &= ~(convertedLedNumberToBit(ledNumber));
+    ,*ledsAddress = ledsImage;
+}
+
+void LedDriver_TurnAllOn(void)
+{
+    ledsImage = ALL_LEDS_ON;
+    ,*ledsAddress = ledsImage;
+}
+#+END_SRC
+
+That is, change the virtual image of LEDs and then update the actual LEDs to be
+consistent with that image.
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling LedDriver.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+r - objs/./src/CircularBuffer/CircularBuffer.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+...........
+-----------------------
+11 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+Refactor on green. Let's capture that meaning into code:
+#+BEGIN_SRC C
+static void updateHardware(void)
+{
+    ,*ledsAddress = ledsImage;
+}
+
+void LedDriver_Create(uint16_t *address)
+{
+    ledsAddress = address;
+    ledsImage = ALL_LEDS_OFF;
+    updateHardware();
+}
+...
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling LedDriver.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+r - objs/./src/CircularBuffer/CircularBuffer.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+...........
+-----------------------
+11 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+Now we turn to the boundary conditions:
+#+BEGIN_SRC C
+TEST(LedDriver, UpperAndLowerBounds)
+{
+    LedDriver_TurnOn(1);
+    LedDriver_TurnOn(16);
+    TEST_ASSERT_EQUAL_HEX16(0x8001, virtualLeds);
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling LedDriverTest.c
+compiling LedDriverTestRunner.c
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+............
+-----------------------
+12 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+Which is expected.
+
+Now we ensure that the mutation over the range does not cause any harm to LEDs:
+#+BEGIN_SRC C
+TEST(LedDriver, OutOfBoundsChangesNothing)
+{
+    LedDriver_TurnOn(-1);
+    LedDriver_TurnOn(0);
+    LedDriver_TurnOn(17);
+    LedDriver_TurnOn(3141);
+
+    TEST_ASSERT_EQUAL_HEX16(0, virtualLeds);
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling LedDriverTest.c
+compiling LedDriverTestRunner.c
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+.........
+TEST(LedDriver, OutOfBoundsChangesNothing)
+    unity/LedDriver/LedDriverTest.c:104: FAIL:
+    Expected 0x0000 Was 0x0010
+....
+-----------------------
+13 Tests 1 Failures 0 Ignored
+FAIL
+make[1]: [all] Error 1 (ignored)
+#+end_example
+
+Is what you expected? I have no prior guess, so let's find out what happend to
+each of calling.
+
+#+BEGIN_SRC C
+TEST(LedDriver, OutOfBoundsChangesNothing)
+{
+    LedDriver_TurnOn(-1);
+    TEST_ASSERT_EQUAL_HEX16(0, virtualLeds);
+    LedDriver_TurnOn(0);
+    TEST_ASSERT_EQUAL_HEX16(0, virtualLeds);
+    LedDriver_TurnOn(17);
+    TEST_ASSERT_EQUAL_HEX16(0, virtualLeds);
+    LedDriver_TurnOn(3141);
+
+    TEST_ASSERT_EQUAL_HEX16(0, virtualLeds);
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling LedDriverTest.c
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+.........
+TEST(LedDriver, OutOfBoundsChangesNothing)
+    unity/LedDriver/LedDriverTest.c:107: FAIL:
+    Expected 0x0000 Was 0x0010
+....
+-----------------------
+13 Tests 1 Failures 0 Ignored
+FAIL
+make[1]: [all] Error 1 (ignored)
+#+end_example
+
+It still complains about the line number 107. Then let's try out this:
+#+BEGIN_SRC C
+TEST(LedDriver, OutOfBoundsChangesNothing)
+{
+    LedDriver_TurnOn(-1);
+    TEST_ASSERT_EQUAL_HEX16(0, virtualLeds);
+    LedDriver_TurnOn(0);
+    TEST_ASSERT_EQUAL_HEX16(0, virtualLeds);
+    LedDriver_TurnOn(17);
+    TEST_ASSERT_EQUAL_HEX16(0, virtualLeds);
+    LedDriver_TurnOn(3141);
+
+    /* TEST_ASSERT_EQUAL_HEX16(0, virtualLeds); */
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+: make -i -f MakefileUnity.mk
+: compiling LedDriverTest.c
+: Linking SandBox_Unity_tests
+: Running SandBox_Unity_tests
+: Unity test run 1 of 1
+: .............
+: -----------------------
+: 13 Tests 0 Failures 0 Ignored
+: OK
+
+So only the last case was the problem. Why is that? If we flip over one page, we
+got the answer -- shifting is rotated around the 32-bit =int=, in other machines
+I guess it would be the default =int= size.
+
+What means we can experiment that by testing the boundary cases like the text
+book did.
+#+BEGIN_SRC C
+TEST(LedDriver, OutOfBoundsChangesNothing)
+{
+    LedDriver_TurnOn(-1);
+    TEST_ASSERT_EQUAL_HEX16(0, virtualLeds);
+    LedDriver_TurnOn(0);
+    TEST_ASSERT_EQUAL_HEX16(0, virtualLeds);
+    LedDriver_TurnOn(17);
+    TEST_ASSERT_EQUAL_HEX16(0, virtualLeds);
+    LedDriver_TurnOn(33);
+    TEST_ASSERT_EQUAL_HEX16(0, virtualLeds);
+    LedDriver_TurnOn(3141);
+
+    /* TEST_ASSERT_EQUAL_HEX16(0, virtualLeds); */
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling LedDriverTest.c
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+.........
+TEST(LedDriver, OutOfBoundsChangesNothing)
+    unity/LedDriver/LedDriverTest.c:106: FAIL:
+    Expected 0x0000 Was 0x0001
+....
+-----------------------
+13 Tests 1 Failures 0 Ignored
+FAIL
+make[1]: [all] Error 1 (ignored)
+#+end_example
+
+And we can also verify that any additional bits over the 16-bit, just truncated
+from 17 case or more explicitly:
+#+BEGIN_SRC C
+TEST(LedDriver, OutOfBoundsChangesNothing)
+{
+    LedDriver_TurnOn(-1);
+    TEST_ASSERT_EQUAL_HEX16(0, virtualLeds);
+    LedDriver_TurnOn(0);
+    TEST_ASSERT_EQUAL_HEX16(0, virtualLeds);
+    LedDriver_TurnOn(17);
+    TEST_ASSERT_EQUAL_HEX16(0, virtualLeds);
+    LedDriver_TurnOn(32);
+    TEST_ASSERT_EQUAL_HEX16(0, virtualLeds);
+    LedDriver_TurnOn(3141);
+
+    /* TEST_ASSERT_EQUAL_HEX16(0, virtualLeds); */
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+: make -i -f MakefileUnity.mk
+: compiling LedDriverTest.c
+: Linking SandBox_Unity_tests
+: Running SandBox_Unity_tests
+: Unity test run 1 of 1
+: .............
+: -----------------------
+: 13 Tests 0 Failures 0 Ignored
+: OK
+
+**** Testing about the =static= qualifier
+The question:
+#+BEGIN_QUOTE
+=Static= qualifier pointer should be allocated to static memory section also?
+#+END_QUOTE
+
+We can verify this with following experiments:
+#+BEGIN_SRC C :main no :exports both :results verbatim
+#include <stdio.h>
+
+void StaticTest(int x)
+{
+    static int *test = 5;
+    printf("%p has value %p, which has value %d\n", &test, test, *test);
+    ,*test = x;                  /* update the test value */
+}
+
+int main(void)
+{
+    int i = 5;
+    while (--i > 0)
+        StaticTest(i);
+    return 0;
+}
+#+END_SRC
+
+#+RESULTS:
+
+Unfortunately, this causes segmentation fault. Why? The compiler warns
+#+BEGIN_QUOTE
+StaticTest.c:5:17: warning: incompatible integer to pointer conversion initializing 'int *' with an expression of type 'int' [-Wint-conversion]
+    static int *test = 5;
+                ^      ~
+#+END_QUOTE
+
+Actually this is due to the fact that we are defining the =test= not =*test=; so
+to the compiler consider that we are trying to assign =5= to =static int *=.
+I've confused with the assignment with definition.
+
+Can we solve our problem using this observation?
+#+BEGIN_SRC C :main no :exports both :results verbatim
+#include <stdio.h>
+
+void StaticTest(int x)
+{
+    static int *test;
+    *test = 5;
+    printf("%p has value %p, which has value %d\n", &test, test, *test);
+    ,*test = x;                  /* update the test value */
+}
+
+int main(void)
+{
+    int i = 5;
+    while (--i > 0)
+        StaticTest(i);
+    return 0;
+}
+#+END_SRC
+
+#+RESULTS:
+
+No! We should better to define the value of =test= explicitly:
+#+BEGIN_SRC C :main no :exports both :results verbatim
+#include <stdio.h>
+
+void StaticTest(int x)
+{
+    static int testVal = 5;
+    static int *test = &testVal;
+    printf("%p has value %p, which has value %d\n", &test, test, *test);
+    ,*test = x;                  /* update the test value */
+}
+
+int main(void)
+{
+    int i = 5;
+    while (--i > 0)
+        StaticTest(i);
+    return 0;
+}
+#+END_SRC
+
+#+RESULTS:
+: 0x100d3d020 has value 0x100d3d018, which has value 5
+: 0x100d3d020 has value 0x100d3d018, which has value 4
+: 0x100d3d020 has value 0x100d3d018, which has value 3
+: 0x100d3d020 has value 0x100d3d018, which has value 2
+
+So we come to the conclusion: =Static= qualifier to pointer variable, allocated
+to static section except "also" part; the value of that initialization /should/
+be static to make compiler happy with that since the initialization of =static=
+variable should be compile time constant!
+
+And also we can reason the other attempts turns out to fail; the uninitialized
+=static= variable initialized with =0=. In the pointer case, it would be =NULL=;
+let's verify that:
+
+#+BEGIN_SRC C :main no :exports both :results verbatim
+#include <stdio.h>
+
+void StaticTest(void)
+{
+    static int *test;
+    printf("%p has value %p; is that value NULL? %d\n", &test, test, test == NULL);
+}
+
+int main(void)
+{
+    StaticTest();
+    return 0;
+}
+#+END_SRC
+
+#+RESULTS:
+: 0x105198018 has value 0x0; is that value NULL? 1
+
+Now we can verify the our conclusion explicitly:
+#+BEGIN_SRC C :main no :exports both :results verbatim
+#include <stdio.h>
+
+void StaticTest(int x)
+{
+    static int *test;
+    test = &a;
+    printf("%p has value %p, which has value %d\n", &test, test, *test);
+    test = &x;                  /* update the test value */
+    printf("%p has value %p, which has value %d\n", &test, test, *test);
+}
+
+int main(void)
+{
+    int i = 5;
+    while (--i > 0)
+        StaticTest(i);
+    return 0;
+}
+#+END_SRC
+
+#+RESULTS:
+: 0x10f29c018 has value 0x7ffee0963f28, which has value 5
+: 0x10f29c018 has value 0x7ffee0963f2c, which has value 4
+: 0x10f29c018 has value 0x7ffee0963f28, which has value 5
+: 0x10f29c018 has value 0x7ffee0963f2c, which has value 3
+: 0x10f29c018 has value 0x7ffee0963f28, which has value 5
+: 0x10f29c018 has value 0x7ffee0963f2c, which has value 2
+: 0x10f29c018 has value 0x7ffee0963f28, which has value 5
+: 0x10f29c018 has value 0x7ffee0963f2c, which has value 1
+
+Here we initialized =test= with the value =NULL= implicitly and then assigned it
+to automatic variable's address. It complements the conclusion: There is no
+restriction at all to the value part except the initialization time.
+
+Also from this series of experiments we came to know that static variables
+are allocated to =0x10....=; whereas automatic variables to =0x7ff....=.
+
+Using this knowledge, we can also resolve another intrigued mind:
+#+BEGIN_QUOTE
+We know that static external variable is private to file scope; then, there is
+any difference it from non-static external variable? That is, the static
+qualification to external variable make it allocated to static memory session?
+#+END_QUOTE
+
+Let's verify:
+#+BEGIN_SRC C :main no :exports both :results verbatim
+int nonStaticVal = 5;
+static int staticVal = 5;
+
+int main(void)
+{
+    printf("non-static external variable has %p as its address\n", &nonStaticVal);
+    printf("static external variable has %p as its address\n", &staticVal);
+    return 0;
+}
+#+END_SRC
+
+#+RESULTS:
+: non-static external variable has 0x1057dc018 as its address
+: static external variable has 0x1057dc01c as its address
+
+Turned out there is no difference than the scope.

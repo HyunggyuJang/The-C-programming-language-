@@ -1,3 +1,12 @@
+#include <stdio.h>
+#define IN 1
+#define OUT 0
+
+
+
+
+
+int main() {
 int c, nl, nw, nc, state;
 
 state = OUT;
@@ -14,3 +23,5 @@ while ((c = getchar()) != EOF) {
     }
 }
 printf("%d %d %d\n", nl, nw, nc);
+return 0;
+}
