@@ -9229,6 +9229,7 @@ OK
 
 Good to go.
 *** Testing Your Way to Done
+**** Grow the Solution from Simple Beginnings
 Let us follows the books contents of this section within the =Sandbox= folder.
 
 First add the next test case that would lead to get rid of all the fake codes:
@@ -9813,7 +9814,370 @@ make codeUnity 2>&1
 : 13 Tests 0 Failures 0 Ignored
 : OK
 
-**** Testing about the =static= qualifier
+Now we know the origin of abnormality. Let's make the test pass by adding guard
+clauses to =LedDriver_TurnOn()=:
+#+BEGIN_SRC C
+void LedDriver_TurnOn(int ledNumber)
+{
+    if (ledNumber <= 0 || ledNumber > 16)
+        return;                 /* silently ignore */
+
+    ledsImage |= convertedLedNumberToBit(ledNumber);
+    updateHardware();
+}
+#+END_SRC
+
+And revert the last test case and then make:
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling LedDriverTest.c
+compiling LedDriver.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+r - objs/./src/CircularBuffer/CircularBuffer.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+.............
+-----------------------
+13 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+Actually, our last test case does not involve the =TurnOff= executions. Let's
+reflect this fact to the test name:
+#+BEGIN_SRC C
+TEST(LedDriver, OutOfBoundsTurnOnDoesNoHarm)
+{
+    LedDriver_TurnOn(-1);
+    LedDriver_TurnOn(0);
+    LedDriver_TurnOn(17);
+    LedDriver_TurnOn(3141);
+
+    TEST_ASSERT_EQUAL_HEX16(0, virtualLeds);
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling LedDriverTest.c
+compiling LedDriverTestRunner.c
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+.............
+-----------------------
+13 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+Now it's time to =TurnOff= cases:
+#+BEGIN_SRC C
+TEST(LedDriver, OutOfBoundsTurnOffDoesNoHarm)
+{
+    LedDriver_TurnAllOn();
+    LedDriver_TurnOff(-1);
+    LedDriver_TurnOff(0);
+    LedDriver_TurnOff(17);
+    LedDriver_TurnOff(3141);
+
+    TEST_ASSERT_EQUAL_HEX16(0xffff, virtualLeds);
+}
+#+END_SRC
+
+Then run:
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling LedDriverTest.c
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+..........
+TEST(LedDriver, OutOfBoundsTurnOffDoesNoHarm)
+    unity/LedDriver/LedDriverTest.c:115: FAIL:
+    Expected 0xFFFF Was 0xFFEF
+....
+-----------------------
+14 Tests 1 Failures 0 Ignored
+FAIL
+make[1]: [all] Error 1 (ignored)
+#+end_example
+
+Now let's add the guard clause to =TurnOff= operation:
+#+BEGIN_SRC C
+void LedDriver_TurnOff(int ledNumber)
+{
+    if (ledNumber <= 0 || ledNumber > 16)
+        return;                 /* silently ignore */
+
+    ledsImage &= ~(convertedLedNumberToBit(ledNumber));
+    updateHardware();
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling LedDriver.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+r - objs/./src/CircularBuffer/CircularBuffer.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+..............
+-----------------------
+14 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+So far, we have ignored the out-of-bound cases silently; but it would be better
+to inform this error to the user of this driver. To do this, let us first assume
+that we have macro called =RUNTIME_ERROR=, which alert the user that error. In
+production code, it will be logged into the event log.
+
+And here is the declaration:
+#+BEGIN_SRC C
+#define RUNTIME_ERROR(description, parameter)   \
+    RuntimeError(description, parameter, __FILE__, __LINE__)
+
+void RuntimeError(const char *message, int parameter,
+                  const char *file, int line);
+#+END_SRC
+
+During test, we should mock the event log system; it will be linked only during
+the test. Here we also used the macros =__FILE__= and =__LINE__=, which can be
+found in the [[https://gcc.gnu.org/onlinedocs/cpp/Standard-Predefined-Macros.html][reference manual]].
+
+#+BEGIN_SRC C
+void RuntimeErrorStub_Reset(void);
+const char *RuntimeErrorStub_GetLastError(void);
+int RuntimeErrorStub_GetLastParameter(void);
+#+END_SRC
+
+Then the mock code:
+#+BEGIN_SRC C
+#include "RunTimeErrorStub.h"
+
+static const char *message = "No Error";
+static int parameter = -1;
+static const char *file = 0;
+static int line = -1;
+
+void RuntimeErrorStub_Reset(void)
+{
+    message = "No Error";
+    parameter = -1;
+}
+
+const char *RuntimeErrorStub_GetLastError(void)
+{
+    return message;
+}
+
+void RuntimeError(const char *m, int p, const char *f, int l)
+{
+    message = m;
+    parameter = p;
+    file = f;
+    line = l;
+}
+
+int RuntimeErrorStub_GetLastParameter(void)
+{
+    return parameter;
+}
+#+END_SRC
+
+Our stub version just capture the error information raised at last.
+
+Now we can code the test:
+#+BEGIN_SRC C
+TEST(LedDriver, OutOfBoundsProducesRuntimeError)
+{
+    LedDriver_TurnOn(-1);
+    TEST_ASSERT_EQUAL_STRING("LED Driver: out-of-bounds LED",
+                             RuntimeErrorStub_GetLastError());
+    TEST_ASSERT_EQUAL(-1, RuntimeErrorStub_GetLastParameter());
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling LedDriverTest.c
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+...........
+TEST(LedDriver, OutOfBoundsProducesRuntimeError)
+    unity/LedDriver/LedDriverTest.c:123: FAIL:
+    Expected 'LED Driver: out-of-bounds LED' Was 'No Error'
+....
+-----------------------
+15 Tests 1 Failures 0 Ignored
+FAIL
+make[1]: [all] Error 1 (ignored)
+#+end_example
+
+Now it's time to add the =RUNTIME_ERROR()= call to replace the ignored guidance:
+#+BEGIN_SRC C
+void LedDriver_TurnOn(int ledNumber)
+{
+    if (ledNumber <= 0 || ledNumber > 16)
+        return RUNTIME_ERROR("LED Driver: out-of-bounds LED", ledNumber);
+
+    ledsImage |= convertedLedNumberToBit(ledNumber);
+    updateHardware();
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling LedDriverTest.c
+compiling LedDriver.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+r - objs/./src/CircularBuffer/CircularBuffer.o
+r - objs/./src/mocks/RunTimeErrorStub.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+...............
+-----------------------
+15 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+As you might notice, our current test is for the =TurnOn= operation; we could
+provide separate test case for =TurnOff= but I've thought it would be more
+natural to combine those into one test case:
+#+BEGIN_SRC C
+TEST(LedDriver, OutOfBoundsProducesRuntimeError)
+{
+    LedDriver_TurnOn(-1);
+    TEST_ASSERT_EQUAL_STRING("LED Driver: out-of-bounds LED",
+                             RuntimeErrorStub_GetLastError());
+    TEST_ASSERT_EQUAL(-1, RuntimeErrorStub_GetLastParameter());
+    RuntimeErrorStub_Reset();
+    LedDriver_TurnOff(17);
+    TEST_ASSERT_EQUAL_STRING("LED Driver: out-of-bounds LED",
+                             RuntimeErrorStub_GetLastError());
+    TEST_ASSERT_EQUAL(17, RuntimeErrorStub_GetLastParameter());
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling LedDriverTest.c
+compiling LedDriver.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+r - objs/./src/CircularBuffer/CircularBuffer.o
+r - objs/./src/mocks/RunTimeErrorStub.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+...........
+TEST(LedDriver, OutOfBoundsProducesRuntimeError)
+    unity/LedDriver/LedDriverTest.c:128: FAIL:
+    Expected 'LED Driver: out-of-bounds LED' Was 'No Error'
+....
+-----------------------
+15 Tests 1 Failures 0 Ignored
+FAIL
+make[1]: [all] Error 1 (ignored)
+#+end_example
+
+Now it's time to change =TurnOff= also accordingly:
+#+BEGIN_SRC C
+void LedDriver_TurnOff(int ledNumber)
+{
+    if (ledNumber <= 0 || ledNumber > 16)
+    {
+        RUNTIME_ERROR("LED Driver: out-of-bounds LED", ledNumber);
+        return;
+    }
+
+    ledsImage &= ~(convertedLedNumberToBit(ledNumber));
+    updateHardware();
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling LedDriver.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+r - objs/./src/CircularBuffer/CircularBuffer.o
+r - objs/./src/mocks/RunTimeErrorStub.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+...............
+-----------------------
+15 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+If we could have decided what to do in runtime when it comes to out-of-bound,
+and it requires another meeting that can not be done immediately, we don't need
+to wait until then; let the unit test harnesses reminds ourself it should be
+done someday:
+#+BEGIN_SRC C
+IGNORE_TEST(LedDriver, OutOfBoundsToDo)
+{
+    /* TODO: what should we do during runtime? */
+}
+#+END_SRC
+
+***** Testing about the =static= qualifier
 The question:
 #+BEGIN_QUOTE
 =Static= qualifier pointer should be allocated to static memory section also?
@@ -9994,3 +10358,1699 @@ int main(void)
 : static external variable has 0x1057dc01c as its address
 
 Turned out there is no difference than the scope.
+**** Keep the Code Clean -- Refactor as You Go
+Now all the tests are passed, it's time to refactor. First, we extract the
+duplicate code into new function via /copying/.
+#+BEGIN_SRC C
+enum {FIRST_LED = 1, LAST_LED = 16};
+
+static BOOL IsLedOutOfBounds(int ledNumber)
+{
+    return ledNumber < FIRST_LED || ledNumber > LAST_LED;
+}
+#+END_SRC
+
+And see whether it compiles:
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling LedDriver.c
+src/LedDriver/LedDriver.c:31:8: error: unknown type name 'BOOL'
+static BOOL IsLedOutOfBounds(int ledNumber)
+       ^
+1 error generated.
+make[1]: [objs/./src/LedDriver/LedDriver.o] Error 1 (ignored)
+Building archive lib/libSandBox_Unity.a
+ar: objs/./src/LedDriver/LedDriver.o: No such file or directory
+r - objs/./src/CircularBuffer/CircularBuffer.o
+r - objs/./src/mocks/RunTimeErrorStub.o
+make[1]: [lib/libSandBox_Unity.a] Error 1 (ignored)
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+...............
+-----------------------
+15 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+Oops we should have included boolean library first:
+#+BEGIN_SRC C
+#include <stdbool.h>            /* boolean */
+#+END_SRC
+
+Then,
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling LedDriver.c
+src/LedDriver/LedDriver.c:31:8: error: unknown type name 'BOOL'
+static BOOL IsLedOutOfBounds(int ledNumber)
+       ^
+1 error generated.
+make[1]: [objs/./src/LedDriver/LedDriver.o] Error 1 (ignored)
+Building archive lib/libSandBox_Unity.a
+ar: objs/./src/LedDriver/LedDriver.o: No such file or directory
+r - objs/./src/CircularBuffer/CircularBuffer.o
+r - objs/./src/mocks/RunTimeErrorStub.o
+make[1]: [lib/libSandBox_Unity.a] Error 1 (ignored)
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+...............
+-----------------------
+15 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+Still complains! Let's try the lower case:
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling LedDriver.c
+src/LedDriver/LedDriver.c:31:13: error: unused function 'IsLedOutOfBounds' [-Werror,-Wunused-function]
+static bool IsLedOutOfBounds(int ledNumber)
+            ^
+1 error generated.
+make[1]: [objs/./src/LedDriver/LedDriver.o] Error 1 (ignored)
+Building archive lib/libSandBox_Unity.a
+ar: objs/./src/LedDriver/LedDriver.o: No such file or directory
+r - objs/./src/CircularBuffer/CircularBuffer.o
+r - objs/./src/mocks/RunTimeErrorStub.o
+make[1]: [lib/libSandBox_Unity.a] Error 1 (ignored)
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+...............
+-----------------------
+15 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+Now it runs expected; let's replace the previous working code in an easy-to-undo
+fashion -- comment:
+#+BEGIN_SRC C
+void LedDriver_TurnOn(int ledNumber)
+{
+    /* if (ledNumber <= 0 || ledNumber > 16) */
+    if (IsLedOutOfBounds(ledNumber))
+    {
+        RUNTIME_ERROR("LED Driver: out-of-bounds LED", ledNumber);
+        return;
+    }
+
+    ledsImage |= convertedLedNumberToBit(ledNumber);
+    updateHardware();
+}
+
+void LedDriver_TurnOff(int ledNumber)
+{
+    /* if (ledNumber <= 0 || ledNumber > 16) */
+    if (IsLedOutOfBounds(ledNumber))
+    {
+        RUNTIME_ERROR("LED Driver: out-of-bounds LED", ledNumber);
+        return;
+    }
+
+    ledsImage &= ~(convertedLedNumberToBit(ledNumber));
+    updateHardware();
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling LedDriver.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+r - objs/./src/CircularBuffer/CircularBuffer.o
+r - objs/./src/mocks/RunTimeErrorStub.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+...............
+-----------------------
+15 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+Now we can safely remove the commented code; after that, we came to realize our
+bit manipulation code are not suitable to current abstract level. Let's extract
+that out as helper function:
+#+BEGIN_SRC C
+static void setLedImageBit(int ledNumber)
+{
+    ledsImage |= convertedLedNumberToBit(ledNumber);
+}
+
+void LedDriver_TurnOn(int ledNumber)
+{
+    if (IsLedOutOfBounds(ledNumber))
+    {
+        RUNTIME_ERROR("LED Driver: out-of-bounds LED", ledNumber);
+        return;
+    }
+
+    setLedImageBit(ledNumber);
+    updateHardware();
+}
+
+static void clearLedImageBit(int ledNumber)
+{
+    ledsImage &= ~(convertedLedNumberToBit(ledNumber));
+}
+
+void LedDriver_TurnOff(int ledNumber)
+{
+    if (IsLedOutOfBounds(ledNumber))
+    {
+        RUNTIME_ERROR("LED Driver: out-of-bounds LED", ledNumber);
+        return;
+    }
+
+    clearLedImageBit(ledNumber);
+    updateHardware();
+}
+
+#+END_SRC
+
+We've batched the changes -- you should do one at a time.
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+: make -i -f MakefileUnity.mk
+: Running SandBox_Unity_tests
+: Unity test run 1 of 1
+: ...............
+: -----------------------
+: 15 Tests 0 Failures 0 Ignored
+: OK
+**** Repeat Until Done
+Let's move on next test clause: Query LED state.
+#+BEGIN_SRC C
+TEST(LedDriver, IsOn)
+{
+    TEST_ASSERT_FALSE(LedDriver_IsOn(11));
+    LedDriver_TurnOn(11);
+    TEST_ASSERT_TRUE(LedDriver_IsOn(11));
+}
+#+END_SRC
+
+And hard code to make the compiler happy:
+#+BEGIN_SRC C
+bool LedDriver_IsOn(int ledNumber)
+{
+    return true;
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling LedDriver.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+r - objs/./src/CircularBuffer/CircularBuffer.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+............
+TEST(LedDriver, IsOn)
+    unity/LedDriver/LedDriverTest.c:139:FAIL: Expected FALSE Was TRUE
+....
+-----------------------
+16 Tests 1 Failures 0 Ignored
+FAIL
+make[1]: [all] Error 1 (ignored)
+#+end_example
+
+Now let's get it right:
+#+BEGIN_SRC C
+bool LedDriver_IsOn(int ledNumber)
+{
+    return ledsImage & (convertedLedNumberToBit(ledNumber));
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling LedDriver.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+r - objs/./src/CircularBuffer/CircularBuffer.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+................
+-----------------------
+16 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+Now we have to think about the out-of-bound case of query. Since the query is
+predicate, it would be reasonable to assume /closed-world/ assumption -- if the
+query is not known to the driver, it is false:
+#+BEGIN_SRC C
+TEST(LedDriver, OutOfBoundsLedsAreAlwaysOff)
+{
+    LedDriver_TurnAllOn();
+    TEST_ASSERT_FALSE(LedDriver_IsOn(0));
+    TEST_ASSERT_FALSE(LedDriver_IsOn(17));
+    TEST_ASSERT_FALSE(LedDriver_IsOn(33));
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling LedDriverTest.c
+compiling LedDriverTestRunner.c
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+.............
+TEST(LedDriver, OutOfBoundsLedsAreAlwaysOff)
+    unity/LedDriver/LedDriverTest.c:149:FAIL: Expected FALSE Was TRUE
+....
+-----------------------
+17 Tests 1 Failures 0 Ignored
+FAIL
+make[1]: [all] Error 1 (ignored)
+#+end_example
+
+Now it's time to add guard:
+#+BEGIN_SRC C
+bool LedDriver_IsOn(int ledNumber)
+{
+    if (IsLedOutOfBounds(ledNumber))
+        return false;
+    return ledsImage & (convertedLedNumberToBit(ledNumber));
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling LedDriver.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+r - objs/./src/CircularBuffer/CircularBuffer.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+.................
+-----------------------
+17 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+Now it's time to query about the off:
+#+BEGIN_SRC C
+TEST(LedDriver, IsOff)
+{
+    TEST_ASSERT_TRUE(LedDriver_IsOff(12));
+    LedDriver_TurnOn(12);
+    TEST_ASSERT_FALSE(LedDriver_IsOff(12));
+}
+#+END_SRC
+
+And the minimum code -- hard-code to false:
+#+BEGIN_SRC C
+bool LedDriver_IsOff(int ledNumber)
+{
+    return false;
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling LedDriverTest.c
+compiling LedDriverTestRunner.c
+compiling LedDriver.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+r - objs/./src/CircularBuffer/CircularBuffer.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+.............
+TEST(LedDriver, IsOff)
+    unity/LedDriver/LedDriverTest.c:154:FAIL: Expected TRUE Was FALSE
+.....
+-----------------------
+18 Tests 1 Failures 0 Ignored
+FAIL
+make[1]: [all] Error 1 (ignored)
+#+end_example
+
+Then code!
+#+BEGIN_SRC C
+bool LedDriver_IsOff(int ledNumber)
+{
+    return !LedDriver_IsOn(ledNumber);
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling LedDriver.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+r - objs/./src/CircularBuffer/CircularBuffer.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+..................
+-----------------------
+18 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+To wrap up, we need to check the out-of-bounds case for =IsOff=:
+#+BEGIN_SRC C
+TEST(LedDriver, OutOfBoundsLedsAreAlwaysOff)
+{
+    LedDriver_TurnAllOn();
+    TEST_ASSERT_FALSE(LedDriver_IsOn(0));
+    TEST_ASSERT_FALSE(LedDriver_IsOn(17));
+    TEST_ASSERT_FALSE(LedDriver_IsOn(33));
+    TEST_ASSERT_TRUE(LedDriver_IsOff(0));
+    TEST_ASSERT_TRUE(LedDriver_IsOff(17));
+    TEST_ASSERT_TRUE(LedDriver_IsOff(33));
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+: make -i -f MakefileUnity.mk
+: compiling LedDriverTest.c
+: Linking SandBox_Unity_tests
+: Running SandBox_Unity_tests
+: Unity test run 1 of 1
+: ..................
+: -----------------------
+: 18 Tests 0 Failures 0 Ignored
+: OK
+
+Now all we need to do in the test list is turn off multiples and turn all off.
+
+Here is the multiple off test:
+#+BEGIN_SRC C
+TEST(LedDriver, TurnOffMultiplesLeds)
+{
+    LedDriver_TurnAllOn();
+    LedDriver_TurnOff(9);
+    LedDriver_TurnOff(8);
+    TEST_ASSERT_EQUAL_HEX16((~0x180)&0xffff, virtualLeds);
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+: make -i -f MakefileUnity.mk
+: compiling LedDriverTestRunner.c
+: Linking SandBox_Unity_tests
+: Running SandBox_Unity_tests
+: Unity test run 1 of 1
+: ...................
+: -----------------------
+: 19 Tests 0 Failures 0 Ignored
+: OK
+
+Works as expected.
+
+And the final test from the test list:
+#+BEGIN_SRC C
+TEST(LedDriver, AllOff)
+{
+    LedDriver_TurnAllOn();
+    LedDriver_TurnAllOff();
+    TEST_ASSERT_EQUAL_HEX16(0, virtualLeds);
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling LedDriver.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+r - objs/./src/CircularBuffer/CircularBuffer.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+........
+TEST(LedDriver, AllOff)
+    unity/LedDriver/LedDriverTest.c:96: FAIL:
+    Expected 0x0000 Was 0xFFFF
+............
+-----------------------
+20 Tests 1 Failures 0 Ignored
+FAIL
+make[1]: [all] Error 1 (ignored)
+#+end_example
+
+Now final implementation:
+#+BEGIN_SRC C
+void LedDriver_TurnAllOff(void)
+{
+    ledsImage = ALL_LEDS_OFF;
+    updateHardware();
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling LedDriver.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+r - objs/./src/CircularBuffer/CircularBuffer.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+....................
+-----------------------
+20 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+**** Take a Step Back Before Claiming /Done/
+**** Put the Knowledge to Work
+***** DONE Do the LED driver example from start to finish on our own
+CLOSED: [2019-11-20 Wed 13:42]
+***** DONE Finish the =CircularBuffer= that we started at the end of the previous chapter.
+CLOSED: [2019-11-20 Wed 20:15]
+Previously, we slipped the check emptiness after one push and pop -- actually we
+need to make that evolve to be more general; after same number of push and pop,
+it should be empty.
+
+Let's continue with that:
+#+BEGIN_SRC C
+TEST(CircularBuffer, SameNumberPushPopEmpty)
+{
+    int pushed = 48;
+    CircularBuffer_Push(pushed, buf);
+    CircularBuffer_Pop(buf);
+    TEST_ASSERT_TRUE(CircularBuffer_IsEmpty(buf));
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling CircularBufferTestRunner.c
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+.....................
+TEST(CircularBuffer, SameNumberPushPopEmpty)
+    unity/CircularBuffer/CircularBufferTest.c:46:FAIL: Expected TRUE Was FALSE
+
+-----------------------
+21 Tests 1 Failures 0 Ignored
+FAIL
+make[1]: [all] Error 1 (ignored)
+#+end_example
+
+Now hard-code:
+#+BEGIN_SRC C
+int CircularBuffer_Pop(CircularBuffer buf)
+{
+    buf->flag |= EMPTY;
+    return 48;
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling CircularBuffer.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+r - objs/./src/CircularBuffer/CircularBuffer.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+.....................
+-----------------------
+21 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+Now we move on to the multiple push & pop case; with this test pass, it will get
+the FIFO property:
+#+BEGIN_SRC C
+TEST(CircularBuffer, MultiplePushPop)
+{
+    int pushed[3] = {234, -123, 6};
+    int i;
+    for (i = 0; i < 3; ++i)
+        CircularBuffer_Push(pushed[i], buf);
+    for (i = 0; i < 3; ++i)
+        TEST_ASSERT_EQUAL(pushed[i], CircularBuffer_Pop(buf));
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling CircularBufferTest.c
+compiling CircularBufferTestRunner.c
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+......................
+TEST(CircularBuffer, MultiplePushPop)
+    unity/CircularBuffer/CircularBufferTest.c:56: FAIL:
+    Expected 234 Was 48
+
+-----------------------
+22 Tests 1 Failures 0 Ignored
+FAIL
+make[1]: [all] Error 1 (ignored)
+#+end_example
+
+Now it fails. Time to implement; not fake out:
+#+BEGIN_SRC C
+#define SIZE 10
+/* enum {EMPTY = 1, FULL = 2}; */
+
+/* Implementation of type */
+struct CircularBufferStructure {
+    /* int going_to_be_implemented; */
+    /* int flag; */
+    int *endp;
+    int *startp;
+    int *frontp;
+    int *rearp;
+};
+
+/* Constructor */
+CircularBuffer CircularBuffer_Create(void)
+{
+    CircularBuffer buf = malloc(sizeof(struct CircularBufferStructure));
+    /* buf->flag = EMPTY; */
+    buf->startp = buf->frontp = buf->rearp = calloc(SIZE, sizeof(int));
+    buf->endp = buf->startp + SIZE;
+    return buf;
+}
+
+/* Destructor */
+void CircularBuffer_Destroy(CircularBuffer buf)
+{
+    free(buf->startp);
+    free(buf);
+}
+
+/* Predicates */
+bool CircularBuffer_IsEmpty(CircularBuffer buf)
+{
+    return buf->frontp == buf->rearp;
+}
+
+bool CircularBuffer_IsFull(CircularBuffer buf)
+{
+    return buf->rearp == buf->endp;
+}
+
+/* Mutators */
+void CircularBuffer_Push(int val, CircularBuffer buf)
+{
+    *buf->rearp++ = val;
+}
+
+int CircularBuffer_Pop(CircularBuffer buf)
+{
+    return *buf->frontp++;
+}
+#+END_SRC
+
+The simplest implementation. Let's check.
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling CircularBuffer.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+r - objs/./src/CircularBuffer/CircularBuffer.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+......................
+-----------------------
+22 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+Since all the test so far passed, it's safe to remove all the fake code.
+
+Now it's time to refactor on green; =SIZE= should be placed in header rather
+than source. It's also the preparation next test.
+
+Next test is to augment the existing test case: =SameNumberPushPopEmpty=:
+#+BEGIN_SRC C
+TEST(CircularBuffer, SameNumberPushPopEmpty)
+{
+    CircularBuffer_Push(48, buf);
+    CircularBuffer_Pop(buf);
+    TEST_ASSERT_TRUE(CircularBuffer_IsEmpty(buf));
+
+    int pushed[3] = {234, -123, 6};
+    int i;
+    for (i = 0; i < 3; ++i)
+        CircularBuffer_Push(pushed[i], buf);
+    for (i = 0; i < 3; ++i)
+        CircularBuffer_Pop(buf);
+    TEST_ASSERT_TRUE(CircularBuffer_IsEmpty(buf));
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling CircularBufferTest.c
+compiling CircularBuffer.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+r - objs/./src/CircularBuffer/CircularBuffer.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+......................
+-----------------------
+22 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+Which test should be next? Since we are going to make /softward vice/, it would
+be better for us to go off the tests for interface rather than for the
+implementation details: Full case test.
+#+BEGIN_SRC C
+TEST(CircularBuffer, IsFull)
+{
+    int pushed[SIZE] = {234, -123, 6,};
+    int i;
+    for (i = 0; i < SIZE; ++i)
+        CircularBuffer_Push(pushed[i], buf);
+    TEST_ASSERT_TRUE(CircularBuffer_IsFull(buf));
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling CircularBufferTest.c
+compiling CircularBufferTestRunner.c
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+.......................
+-----------------------
+23 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+Our full cases doesn't count the wrapping case; it's natural since our program
+does not have any test that checks the wrapped around case.
+
+This time we will try to implement the overflow, underflow cases. We have to
+decide what to do in those cases; since those are the unexpected usage, it would
+be reasonable to raise that error appropriately. Already we have that mechanism
+in our code base -- =RUNTIME_ERROR=; also the mocked version.
+
+#+BEGIN_SRC C
+TEST(CircularBuffer, PushToFullProducesOverflow)
+{
+    int pushed[SIZE] = {234, -123, 6,};
+    int i;
+    for (i = 0; i < SIZE; ++i)
+        CircularBuffer_Push(pushed[i], buf);
+    TEST_ASSERT_TRUE(CircularBuffer_IsFull(buf));
+    CircularBuffer_Push(21, buf);
+    TEST_ASSERT_EQUAL_STRING("CircularBuffer: buffer is overflowed",
+                             RuntimeErrorStub_GetLastError());
+    TEST_ASSERT_EQUAL(21, RuntimeErrorStub_GetLastParameter());
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling CircularBufferTestRunner.c
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+........................
+TEST(CircularBuffer, PushToFullProducesOverflow)
+    unity/CircularBuffer/CircularBufferTest.c:85: FAIL:
+    Expected 'CircularBuffer: buffer is overflowed' Was 'LED Driver: out-of-bounds LED'
+
+-----------------------
+24 Tests 1 Failures 0 Ignored
+FAIL
+make[1]: [all] Error 1 (ignored)
+#+end_example
+
+Now add the implementation (we have changed the description part more
+appropriately):
+#+BEGIN_SRC C
+void CircularBuffer_Push(int val, CircularBuffer buf)
+{
+    if (CircularBuffer_IsFull(buf))
+    {
+        RUNTIME_ERROR(
+            "CircularBuffer: push is attempted to buffer that is already full",
+            val);
+        return;
+    }
+    *buf->rearp++ = val;
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+: make -i -f MakefileUnity.mk
+: compiling CircularBufferTestRunner.c
+: Linking SandBox_Unity_tests
+: Running SandBox_Unity_tests
+: Unity test run 1 of 1
+: ........................
+: -----------------------
+: 24 Tests 0 Failures 0 Ignored
+: OK
+
+Next is the underflow case. Before that, let's refactor the test case since the
+duplicate code floating around the test code:
+#+BEGIN_SRC C
+static void FillWith(int numberOfElements, int startingNumber)
+{
+    for (; numberOfElements-- > 0; ++startingNumber)
+        CircularBuffer_Push(startingNumber, buf);
+}
+
+TEST(CircularBuffer, IsFull)
+{
+    FillWith(SIZE, 21);
+    TEST_ASSERT_TRUE(CircularBuffer_IsFull(buf));
+}
+
+TEST(CircularBuffer, PushToFullProducesRuntimeError)
+{
+    FillWith(SIZE, 5235);
+    TEST_ASSERT_TRUE(CircularBuffer_IsFull(buf));
+    CircularBuffer_Push(21, buf);
+    TEST_ASSERT_EQUAL_STRING(
+        "CircularBuffer: push is attempted to buffer that is already full",
+        RuntimeErrorStub_GetLastError());
+    TEST_ASSERT_EQUAL(21, RuntimeErrorStub_GetLastParameter());
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+: make -i -f MakefileUnity.mk
+: compiling CircularBufferTest.c
+: Linking SandBox_Unity_tests
+: Running SandBox_Unity_tests
+: Unity test run 1 of 1
+: ........................
+: -----------------------
+: 24 Tests 0 Failures 0 Ignored
+: OK
+
+Now underflow case:
+#+BEGIN_SRC C
+TEST(CircularBuffer, PopToEmptyBufferProducesRuntimeError)
+{
+    TEST_ASSERT_TRUE(CircularBuffer_IsEmpty(buf));
+    RuntimeErrorStub_Reset();
+    CircularBuffer_Pop(buf);
+    TEST_ASSERT_EQUAL_STRING(
+        "CircularBuffer: pop is attempted to buffer that is empty",
+        RuntimeErrorStub_GetLastError());
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling CircularBufferTest.c
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+.........................
+TEST(CircularBuffer, PopToEmptyBufferProducesRuntimeError)
+    unity/CircularBuffer/CircularBufferTest.c:97: FAIL:
+    Expected 'CircularBuffer: pop is attempted to buffer that is empty' Was 'No Error'
+
+-----------------------
+25 Tests 1 Failures 0 Ignored
+FAIL
+make[1]: [all] Error 1 (ignored)
+#+end_example
+
+Then code:
+#+BEGIN_SRC C
+int CircularBuffer_Pop(CircularBuffer buf)
+{
+    if (CircularBuffer_IsEmpty(buf))
+    {
+        RUNTIME_ERROR(
+            "CircularBuffer: pop is attempted to buffer that is empty",
+            0);
+        return 0;               /* Need to consider what is appropriate number to return */
+    }
+    return *buf->frontp++;
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling CircularBuffer.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+r - objs/./src/CircularBuffer/CircularBuffer.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+.........................
+-----------------------
+25 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+It's time to handle the wrapping case:
+#+BEGIN_SRC C
+TEST(CircularBuffer, PushWrappedAroundShouldNotProduceOverflow)
+{
+    RuntimeErrorStub_Reset();
+    FillWith(SIZE, 52);
+    CircularBuffer_Pop(buf);
+    CircularBuffer_Push(2341, buf);
+    TEST_ASSERT_EQUAL_STRING(
+        "No Error",
+        RuntimeErrorStub_GetLastError());
+    TEST_ASSERT_EQUAL(-1, RuntimeErrorStub_GetLastParameter());
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling CircularBufferTest.c
+compiling CircularBufferTestRunner.c
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+..........................
+TEST(CircularBuffer, PushWrappedAroundShouldNotProduceOverflow)
+    unity/CircularBuffer/CircularBufferTest.c:108: FAIL:
+    Expected 'No Error' Was 'CircularBuffer: push is attempted to buffer that is already full'
+
+-----------------------
+26 Tests 1 Failures 0 Ignored
+FAIL
+make[1]: [all] Error 1 (ignored)
+#+end_example
+
+Then code:
+#+BEGIN_SRC C
+void CircularBuffer_Push(int val, CircularBuffer buf)
+{
+    if (CircularBuffer_IsFull(buf))
+    {
+        RUNTIME_ERROR(
+            "CircularBuffer: push is attempted to buffer that is already full",
+            val);
+        return;
+    }
+    *buf->rearp++ = val;
+    if (buf->rearp == buf->endp) /* wrapped around */
+        buf->rearp = buf->startp;
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+.......................
+TEST(CircularBuffer, IsFull)
+    unity/CircularBuffer/CircularBufferTest.c:75:FAIL: Expected TRUE Was FALSE
+.
+TEST(CircularBuffer, PushToFullProducesRuntimeError)
+    unity/CircularBuffer/CircularBufferTest.c:81:FAIL: Expected TRUE Was FALSE
+..
+TEST(CircularBuffer, PushWrappedAroundShouldNotProduceOverflow)
+    unity/CircularBuffer/CircularBufferTest.c:108: FAIL:
+    Expected 'No Error' Was 'CircularBuffer: pop is attempted to buffer that is empty'
+
+-----------------------
+26 Tests 3 Failures 0 Ignored
+FAIL
+make[1]: [all] Error 3 (ignored)
+#+end_example
+
+Oops, let's revert and retry:
+#+BEGIN_SRC C
+void CircularBuffer_Push(int val, CircularBuffer buf)
+{
+    if (CircularBuffer_IsFull(buf))
+    {
+        RUNTIME_ERROR(
+            "CircularBuffer: push is attempted to buffer that is already full",
+            val);
+        return;
+    }
+
+    if (buf->rearp == buf->endp) /* wrapped around */
+        buf->rearp = buf->startp;
+    *buf->rearp++ = val;
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling CircularBuffer.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+r - objs/./src/CircularBuffer/CircularBuffer.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+..........................
+TEST(CircularBuffer, PushWrappedAroundShouldNotProduceOverflow)
+    unity/CircularBuffer/CircularBufferTest.c:108: FAIL:
+    Expected 'No Error' Was 'CircularBuffer: push is attempted to buffer that is already full'
+
+-----------------------
+26 Tests 1 Failures 0 Ignored
+FAIL
+make[1]: [all] Error 1 (ignored)
+#+end_example
+
+It got better. We need to modify the =IsFull=, which does not account the wrapping:
+#+BEGIN_SRC C
+bool CircularBuffer_IsFull(CircularBuffer buf)
+{
+    return buf->frontp > buf->rearp
+        ? buf->rearp + SIZE - buf->frontp >= SIZE
+        : buf->rearp - buf->frontp >=SIZE;
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling CircularBuffer.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+r - objs/./src/CircularBuffer/CircularBuffer.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+..........................
+-----------------------
+26 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+Next we ensure the wrapped pop case:
+#+BEGIN_SRC C
+TEST(CircularBuffer, PopWrappedAroundShouldNotProduceRuntimeError)
+{
+    RuntimeErrorStub_Reset();
+    FillWith(SIZE, 52);
+    int i = SIZE;
+    while (i-- > 0)
+        CircularBuffer_Pop(buf);
+    CircularBuffer_Push(2341, buf);
+    CircularBuffer_Pop(buf);
+    TEST_ASSERT_EQUAL_STRING(
+        "No Error",
+        RuntimeErrorStub_GetLastError());
+    TEST_ASSERT_EQUAL(-1, RuntimeErrorStub_GetLastParameter());
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling CircularBufferTest.c
+compiling CircularBufferTestRunner.c
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+...........................
+-----------------------
+27 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+We expected the test to fail but it passed by an accident; let's rethink what we
+should do. We have tested that =push= handles wrapping without runtime error. We
+tried to do same thing to =pop=; however, while =push= write memory with given
+value, =pop= just read memory. Actually we don't have to worry about the
+harm =pop= would cause. All we should do is =pop= follows the FIFO
+specification.
+
+So above test is good as it is. Next we test the FIFO property while wrapping:
+#+BEGIN_SRC C
+TEST(CircularBuffer, FIFOWhileWrappedAround)
+{
+    int i;
+    int start = 52;
+    FillWith(SIZE, start);
+    for (i = SIZE; i > 0; i--)
+        TEST_ASSERT_EQUAL(start++, CircularBuffer_Pop(buf));
+    FillWith(SIZE, start);
+    for (i = SIZE; i > 0; i--)
+        TEST_ASSERT_EQUAL(start++, CircularBuffer_Pop(buf));
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling CircularBufferTest.c
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+............................
+TEST(CircularBuffer, FIFOWhileWrappedAround)
+    unity/CircularBuffer/CircularBufferTest.c:149: FAIL:
+    Expected 62 Was 0
+
+-----------------------
+28 Tests 1 Failures 0 Ignored
+FAIL
+make[1]: [all] Error 1 (ignored)
+#+end_example
+
+Time to code the =pop= to handle wrapping case:
+#+BEGIN_SRC C
+int CircularBuffer_Pop(CircularBuffer buf)
+{
+    if (CircularBuffer_IsEmpty(buf))
+    {
+        RUNTIME_ERROR(
+            "CircularBuffer: pop is attempted to buffer that is empty",
+            0);
+        return 0;               /* Need to consider what is appropriate number to return */
+    }
+
+    if (buf->frontp == buf->endp) /* wrapped around */
+        buf->frontp = buf->startp;
+
+    return *buf->frontp++;
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling CircularBufferTest.c
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+............................
+TEST(CircularBuffer, FIFOWhileWrappedAround)
+    unity/CircularBuffer/CircularBufferTest.c:149: FAIL:
+    Expected 62 Was 0
+
+-----------------------
+28 Tests 1 Failures 0 Ignored
+FAIL
+make[1]: [all] Error 1 (ignored)
+#+end_example
+
+This naive implementation doesn't work. Would it change if we change the order?
+#+BEGIN_SRC C
+int CircularBuffer_Pop(CircularBuffer buf)
+{
+    if (buf->frontp == buf->endp) /* wrapped around */
+        buf->frontp = buf->startp;
+
+    if (CircularBuffer_IsEmpty(buf))
+    {
+        RUNTIME_ERROR(
+            "CircularBuffer: pop is attempted to buffer that is empty",
+            0);
+        return 0;               /* Need to consider what is appropriate number to return */
+    }
+
+    return *buf->frontp++;
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling CircularBuffer.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+r - objs/./src/CircularBuffer/CircularBuffer.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+............................
+-----------------------
+28 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+Yes it solves. Actually this particular order is crucial -- if we change these
+order in either =pop= or =push=, it won't work:
+#+BEGIN_SRC C
+/* Mutators */
+void CircularBuffer_Push(int val, CircularBuffer buf)
+{
+    if (buf->rearp == buf->endp) /* wrapped around */
+        buf->rearp = buf->startp;
+
+    if (CircularBuffer_IsFull(buf))
+    {
+        RUNTIME_ERROR(
+            "CircularBuffer: push is attempted to buffer that is already full",
+            val);
+        return;
+    }
+
+    *buf->rearp++ = val;
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling CircularBuffer.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+r - objs/./src/CircularBuffer/CircularBuffer.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+........................
+TEST(CircularBuffer, PushToFullProducesRuntimeError)
+    unity/CircularBuffer/CircularBufferTest.c:87: FAIL:
+    Expected 'CircularBuffer: push is attempted to buffer that is already full' Was 'No Error'
+....
+-----------------------
+28 Tests 1 Failures 0 Ignored
+FAIL
+make[1]: [all] Error 1 (ignored)
+#+end_example
+
+Finally, we test the full and empty test with wrapping:
+#+BEGIN_SRC C
+TEST(CircularBuffer, EmptyFullEmptyWrapped)
+{
+    int i;
+    int start = 52;
+    TEST_ASSERT_TRUE(CircularBuffer_IsEmpty(buf));
+    FillWith(SIZE, start);
+    TEST_ASSERT_TRUE(CircularBuffer_IsFull(buf));
+    for (i = SIZE; i > 0; i--)
+        TEST_ASSERT_EQUAL(start++, CircularBuffer_Pop(buf));
+    TEST_ASSERT_TRUE(CircularBuffer_IsEmpty(buf));
+    FillWith(SIZE, start);
+    TEST_ASSERT_TRUE(CircularBuffer_IsFull(buf));
+    for (i = SIZE; i > 0; i--)
+        TEST_ASSERT_EQUAL(start++, CircularBuffer_Pop(buf));
+    TEST_ASSERT_TRUE(CircularBuffer_IsEmpty(buf));
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling CircularBufferTest.c
+compiling CircularBufferTestRunner.c
+compiling CircularBuffer.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+r - objs/./src/CircularBuffer/CircularBuffer.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+.............................
+TEST(CircularBuffer, EmptyFullEmptyWrapped)
+    unity/CircularBuffer/CircularBufferTest.c:163:FAIL: Expected TRUE Was FALSE
+
+-----------------------
+29 Tests 1 Failures 0 Ignored
+FAIL
+make[1]: [all] Error 1 (ignored)
+#+end_example
+
+This test detect error we have not noticed; after some experiment with our
+implementation model, we can not cope with the full state from empty state just
+with the current state variables. It would be natural to keep track of the
+current number of elements in the structure:
+#+BEGIN_SRC C
+/* Implementation of type */
+struct CircularBufferStructure {
+    int *endp;
+    int *startp;
+    int *frontp;
+    int *rearp;
+    int nelem;
+};
+
+/* Constructor */
+CircularBuffer CircularBuffer_Create(void)
+{
+    CircularBuffer buf = malloc(sizeof(struct CircularBufferStructure));
+    buf->startp = buf->frontp = buf->rearp = calloc(SIZE, sizeof(int));
+    buf->endp = buf->startp + SIZE;
+    buf->nelem = 0;
+    return buf;
+}
+
+/* Predicates */
+bool CircularBuffer_IsEmpty(CircularBuffer buf)
+{
+    return !buf->nelem;
+}
+
+bool CircularBuffer_IsFull(CircularBuffer buf)
+{
+    return buf->nelem == SIZE;
+}
+
+/* Mutators */
+void CircularBuffer_Push(int val, CircularBuffer buf)
+{
+    if (CircularBuffer_IsFull(buf))
+    {
+        RUNTIME_ERROR(
+            "CircularBuffer: push is attempted to buffer that is already full",
+            val);
+        return;
+    }
+
+    if (buf->rearp == buf->endp) /* wrapped around */
+        buf->rearp = buf->startp;
+
+    buf->nelem++;
+    ,*buf->rearp++ = val;
+}
+
+int CircularBuffer_Pop(CircularBuffer buf)
+{
+    if (buf->frontp == buf->endp) /* wrapped around */
+        buf->frontp = buf->startp;
+
+    if (CircularBuffer_IsEmpty(buf))
+    {
+        RUNTIME_ERROR(
+            "CircularBuffer: pop is attempted to buffer that is empty",
+            0);
+        return 0;               /* Need to consider what is appropriate number to return */
+    }
+
+    buf->nelem--;
+    return *buf->frontp++;
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling CircularBuffer.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+r - objs/./src/CircularBuffer/CircularBuffer.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+.............................
+-----------------------
+29 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+It's time to get rid of the =SIZE=; let user specify the size of buffer:
+#+BEGIN_SRC C
+/* Implementation of type */
+struct CircularBufferStructure {
+    int *endp;
+    int *startp;
+    int *frontp;
+    int *rearp;
+    int nelem;
+    int capacity;
+};
+
+/* Constructor */
+CircularBuffer CircularBuffer_Create(int capacity)
+{
+    CircularBuffer buf = malloc(sizeof(struct CircularBufferStructure));
+    buf->startp = buf->frontp = buf->rearp = calloc(capacity, sizeof(int));
+    buf->endp = buf->startp + capacity;
+    buf->nelem = 0;
+    buf->capacity = capacity;
+    return buf;
+}
+
+/* Selector */
+int CircularBuffer_Capacity(CircularBuffer buf)
+{
+    return buf->capacity;
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling CircularBufferTest.c
+compiling CircularBuffer.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+r - objs/./src/CircularBuffer/CircularBuffer.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+.............................
+-----------------------
+29 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+Now add creation test:
+#+BEGIN_SRC C
+TEST(CircularBuffer, UserCanSpecifyCapacity)
+{
+    CircularBuffer userSpecifiedBuf = CircularBuffer_Create(582);
+    TEST_ASSERT_EQUAL(582, CircularBuffer_Capacity(userSpecifiedBuf));
+    CircularBuffer_Destroy(userSpecifiedBuf);
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling CircularBufferTest.c
+compiling CircularBufferTestRunner.c
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+..............................
+-----------------------
+30 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+Here we used the fact that ANSI C assure that the pointer arithmetic using just
+past the end of array is legal -- relying on =calloc=. If we want to be really
+conservative about that, we could add the additional guard to the end of the
+pointer; using that we could also test the integrity of memory just before
+destruction. Via that method, we can come to believe that our =push= method does
+not mutate the memory in out-of-range explicitly.
+
+Let's try that. All we need to change is just
+#+BEGIN_SRC C
+#define BUF_GUARD 0x341         /* for check integrity */
+
+/* Constructor */
+CircularBuffer CircularBuffer_Create(int capacity)
+{
+    CircularBuffer buf = malloc(sizeof(struct CircularBufferStructure));
+    buf->startp = buf->frontp = buf->rearp = calloc(capacity + 1, sizeof(int));
+    buf->endp = buf->startp + capacity;
+    buf->nelem = 0;
+    buf->capacity = capacity;
+    ,*buf->endp = BUF_GUARD;
+    return buf;
+}
+#+END_SRC
+
+And
+#+BEGIN_SRC C
+bool CircularBuffer_VerifyIntegrity(CircularBuffer buf)
+{
+    return *buf->endp == BUF_GUARD;
+}
+#+END_SRC
+
+Now we can test the integrity by
+#+BEGIN_SRC C
+TEST_TEAR_DOWN(CircularBuffer)
+{
+    CircularBuffer_VerifyIntegrity(buf);
+    CircularBuffer_Destroy(buf);
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling CircularBufferTest.c
+compiling CircularBuffer.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+r - objs/./src/CircularBuffer/CircularBuffer.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+..............................
+-----------------------
+30 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+But we should notice that this verifying function sneaked into the source code
+not only in test code; it is hard to imagine the user of =CircularBuffer= would
+ever need to use =VerifyIntegrity= function -- it should be ensured by
+whom implemented. So I myself think it would be reverted to the previous one and
+let the one implementing reason about the integrity of memory since it can be
+easily deduced from the code structure.
+
+And final verification:
+#+BEGIN_SRC sh :exports both :results verbatim
+cd C_codes/TDD/code/SandBox
+make codeUnity 2>&1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+make -i -f MakefileUnity.mk
+compiling CircularBufferTest.c
+compiling CircularBuffer.c
+Building archive lib/libSandBox_Unity.a
+r - objs/./src/LedDriver/LedDriver.o
+r - objs/./src/CircularBuffer/CircularBuffer.o
+Linking SandBox_Unity_tests
+Running SandBox_Unity_tests
+Unity test run 1 of 1
+..............................
+-----------------------
+30 Tests 0 Failures 0 Ignored
+OK
+#+end_example
+
+***** TODO Modify the =LedDriver= and its tests to use inverted logic.
+***** TODO Encompass both version in our =LedDriver=.
+***** TODO Deal with the reversed address of LEDs.
