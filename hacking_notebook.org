@@ -10828,6 +10828,61 @@ void SortLines_ParseCommandline(int argc, char *argv[])
 }
 
 #+END_SRC
+
+And finally, we just clean up only for the topmost abstraction, we got
+#+BEGIN_SRC C
+#include "SortLines.h"
+#include "Readlines.h"
+#include "QuickSort.h"
+#include "Utils.h"
+#include "SortLines_options.h"
+#include "SortLines_compareSetter.h"
+
+static char *linePointers[MAXLINES];
+
+void SortLines_ParseCommandline(int argc, char *argv[])
+{
+    initializeParsedOptions();
+
+    setDefaultCurrentOption();
+
+    while (--argc > 0 && (*++argv)[0] == '-')
+    {
+        if (isFieldOption(++argv[0]))
+            FieldOption_Parse(++argv[0]);
+        else
+            parseDefaultOptions(argv[0]);
+
+    }
+    /* ParseOption_HaveUnparsedCommand */
+    if (argc > 0)
+        FormatOutput("Usage: sortLines -[k%%d]drnf[,\%%d]\n");
+    if (FieldOption_IsCreated())
+        SortLines_SetFieldOption();
+}
+
+int SortLines(void)
+{
+    int numberOfLinesRead = readlines(linePointers, MAXLINES);
+
+    if (numberOfLinesRead < 0)
+    {
+        FormatOutput("input too big to sort\n");
+        return 1;
+    }
+
+    setCompareProcedure();
+
+    quickSort((void **) linePointers, 0,
+              numberOfLinesRead - 1,
+              (int (*)(void *, void *))
+              compare);
+
+    writelines(linePointers, numberOfLinesRead);
+
+    return 0;
+}
+#+END_SRC
 * Test-Driven Development for Embedded C
 :PROPERTIES:
 :NOTER_DOCUMENT: ../MEGAsync/MIT Challenge/6.001/Test-Driven Development for Embedded C [Grenning 2011-05-05].pdf

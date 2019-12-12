@@ -167,7 +167,7 @@ TEST(SortLines, ParseUnknownCommand)
 {
   char *fakeArgv[] = { "progname", "unknown" };
   SortLines_ParseCommandline(2, fakeArgv);
-  STRCMP_EQUAL("Usage: sortLines -n -r\n",
+  STRCMP_EQUAL("Usage: sortLines -[k%d]drnf[,%d]\n",
                FormatOutputSpy_GetOutput());
 }
 
