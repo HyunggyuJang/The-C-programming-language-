@@ -5,6 +5,7 @@
 #include <stdlib.h>             /* atof */
 #include "QuickSort.h"
 #include "Utils.h"
+#include "common.h"
 
 static char *linePointers[MAXLINES];
 
@@ -24,92 +25,157 @@ typedef struct
 } FieldOption;
 
 static OptionType currentOption;
-static unsigned int startField;
-static unsigned int endField;
-
 
 static FieldOption *optionsHead;
 static FieldOption *optionsTail;
 static FieldOption *currentOptionp;
 
+static char *parseNonFieldOptions(OptionType *option, char *toBeParsed)
+{
+    for (; *toBeParsed; ++toBeParsed) {
+        switch (*toBeParsed) {
+            case 'n':
+                option->isNumeric = 1;
+                break;
+            case 'r':
+                option->shouldReverse = 1;
+                break;
+            case 'f':
+                option->shouldFold = 1;
+                break;
+            case 'd':
+                option->isDirectory = 1;
+                break;
+            default:
+                return toBeParsed;
+        }
+    }
+    return toBeParsed;
+}
+
+BOOL isFieldOption(char *optionString)
+{
+    return (*optionString == 'k');
+}
+
+void FieldOption_Initialize(void)
+{
+    optionsHead = optionsTail = 0;
+}
+
+BOOL FieldOption_IsCreated(void)
+{
+    return optionsHead;
+}
+
+void FieldOption_Create(void)
+{
+    optionsHead = (FieldOption *) malloc(2 * sizeof (FieldOption));
+    memset(optionsHead, 0, sizeof (FieldOption));
+    currentOptionp = optionsHead;
+    optionsTail = optionsHead + 1;
+}
+
+void FieldOption_Extend(void)
+{
+    int size = 0;
+    for (FieldOption *ptmp = optionsHead; ptmp != optionsTail; ++ptmp)
+        size++;
+    optionsHead = (FieldOption *)
+        (realloc(optionsHead, sizeof (FieldOption) * (size + 2)));
+    currentOptionp = optionsHead + size;
+    memset(currentOptionp, 0, sizeof (FieldOption));
+    optionsTail = optionsHead + size + 1;
+}
+
+char *FieldOption_ParseStartField(char *optionString)
+{
+    if (!isdigit(*optionString))
+    {
+        FormatOutput("sortLines: illegal field option %c, expected integer\n",
+                     *optionString);
+        return NULL;
+    }
+
+    do
+    {
+        currentOptionp->startField =
+            10 * currentOptionp->startField + *optionString - '0';
+    } while (isdigit(*++optionString));
+
+    return optionString;
+}
+
+void FieldOption_ParseEndField(char *optionString)
+{
+    if (!isdigit(*optionString))
+    {
+        FormatOutput("sortLines: illegal field option %c, expected integer\n",
+                     *optionString);
+        return;
+    }
+
+    do
+    {
+        currentOptionp->endField =
+            10 * currentOptionp->endField + *optionString - '0';
+    } while (isdigit(*++optionString));
+    if (*optionString)
+        FormatOutput("sortLines: illegal field option %c, expected none\n",
+                     *optionString);
+}
+
+void FieldOption_Parse(char *optionString)
+{
+    if (FieldOption_IsCreated())
+        FieldOption_Extend();
+    else
+        FieldOption_Create();
+    optionString = FieldOption_ParseStartField(optionString);
+
+    if (!optionString)
+        return;
+
+    optionString = parseNonFieldOptions(&currentOptionp->option, optionString);
+
+    if (!*optionString)
+        return;
+
+    if (*optionString != ',')
+    {
+        FormatOutput("sortLines: unsupported option %c\n", *optionString);
+        return;
+    }
+
+    FieldOption_ParseEndField(++optionString);
+}
+
+void initializeParsedOptions(void)
+{
+    memset(&currentOption, 0, sizeof(OptionType));
+    FieldOption_Initialize();
+}
+
 void SortLines_ParseCommandline(int argc, char *argv[])
 {
     int c;
 
-    currentOption.isNumeric = currentOption.shouldReverse
-        = currentOption.shouldFold = currentOption.isDirectory = 0;
-
-    optionsHead = optionsTail = 0;
+    initializeParsedOptions();
 
     currentOptionp = (FieldOption *) &currentOption;
 
     while (--argc > 0 && (*++argv)[0] == '-')
     {
-        if ((c = *++argv[0]) == 'k')
+        if (isFieldOption(++argv[0]))
+            FieldOption_Parse(++argv[0]);
+        else
         {
-            if (!optionsHead)
-            {
-                optionsHead = (FieldOption *) malloc(2 * sizeof (FieldOption));
-                memset(optionsHead, 0, sizeof (FieldOption));
-                currentOptionp = optionsHead;
-                optionsTail = optionsHead + 1;
-            }
-            else
-            {
-                int size = 0;
-                for (FieldOption *ptmp = optionsHead; ptmp != optionsTail; ++ptmp)
-                    size++;
-                optionsHead = (FieldOption *)
-                    (realloc(optionsHead, sizeof (FieldOption) * (size + 2)));
-                currentOptionp = optionsHead + size;
-                memset(currentOptionp, 0, sizeof (FieldOption));
-                optionsTail = optionsHead + size + 1;
-            }
-            if (!((c = *++argv[0]) && isdigit(c)))
-            {
-                FormatOutput("sortLines: illegal field option %c, expected integer\n",
-                             c);
-                continue;
-            }
-
-            do
-            {
-                currentOptionp->startField = 10 * currentOptionp->startField + c - '0';
-            } while (isdigit(c = *++argv[0]));
+            char *unparsedString = parseNonFieldOptions(&currentOption, argv[0]);
+            if (*unparsedString)
+                FormatOutput("sortLines: unsupported option %c\n", *unparsedString);
         }
-
-        for (; c; c = *++argv[0]) {
-            switch (c) {
-                case 'n':
-                    currentOptionp->option.isNumeric = 1;
-                    break;
-                case 'r':
-                    currentOptionp->option.shouldReverse = 1;
-                    break;
-                case 'f':
-                    currentOptionp->option.shouldFold = 1;
-                    break;
-                case 'd':
-                    currentOptionp->option.isDirectory = 1;
-                    break;
-                default:
-                    if (c == ',' && currentOptionp->startField)
-                        goto ParseTheRestOfField;
-                    FormatOutput("sortLines: unsupported option %c\n", c);
-            }
-        }
-
-        continue;
-
-    ParseTheRestOfField:
-        while (isdigit(c = *++argv[0]))
-            currentOptionp->endField = 10 * currentOptionp->endField + c - '0';
-        if (c)
-            FormatOutput("sortLines: illegal field option %c, expected none\n",
-                         c);
-        continue;
     }
-
+    /* ParseOption_HaveUnparsedCommand */
     if (argc > 0)
         FormatOutput("Usage: sortLines -n -r\n");
     if (optionsHead)
@@ -181,7 +247,7 @@ int numcmp(char *s1, char *s2)
 }
 
 static int (*compareProc)(char *s1, char *s2);
-static void (*preProcessors[3])(char *to, char *from);
+static void (*preProcessors[4])(char *to, char *from);
 static int (*postProcessor)(int processed);
 static int (*tieBreaker)(char *s1, char *s2);
 
@@ -210,19 +276,24 @@ static int compare(char *s1, char *s2)
         return tieBreaker(s1, s2);
 }
 
+/* toLowers ADT */
 static void toLowers(char *destination, char *source)
 {
     while ((*destination++ = tolower(*source++)))
         ;
 }
 
+/* chooseFieldADT */
+static int startField;
+static int endField;
+
 static void chooseField(char *destination, char *source)
 {
-    int startField = currentOptionp->startField;
-    int endOffset = currentOptionp->endField - currentOptionp->startField;
+    int tStartField = startField;
+    int endOffset = endField - startField;
     for (; isspace(*source); ++source)
         ;
-    while (--startField > 0)
+    while (--tStartField > 0)
     {
         while (!isspace(*source++))
             ;
@@ -244,6 +315,14 @@ static void chooseField(char *destination, char *source)
     while (--endOffset >= 0);
 }
 
+static void (*chooseFieldFromRange(int startingField, int endingField))(char *, char *)
+{
+    startField = startingField;
+    endField = endingField;
+    return chooseField;
+}
+
+/* toDirectoryCharsADT */
 static void toDirectoryChars(char *destination, char *source)
 {
     for (; *source; ++source)
@@ -252,6 +331,7 @@ static void toDirectoryChars(char *destination, char *source)
     *destination = '\0';
 }
 
+/* postProcessor functions */
 static int invertOutput(int processed)
 {
     return -processed;
@@ -264,6 +344,7 @@ static int idendity(int processed)
 
 static void setCompareProcedure(void);
 
+/* tieBreaker functions */
 static int tieBreakUsingNextField(char *s1, char *s2)
 {
     if (!SortLines_HaveNextFieldOption())
@@ -285,7 +366,10 @@ static void setCompareProcedure(void)
 {
     int i = 0;
     if (SortLines_StartField())
-        preProcessors[i++] = chooseField;
+        preProcessors[i++] =
+            chooseFieldFromRange(currentOptionp->startField,
+                                 currentOptionp->endField);
+
 
     if (SortLines_IsDirectoryOrder())
         preProcessors[i++] = toDirectoryChars;
@@ -324,6 +408,7 @@ int SortLines(void)
               numberOfLinesRead - 1,
               (int (*)(void *, void *))
               compare);
+
     writelines(linePointers, numberOfLinesRead);
 
     return 0;
